@@ -23,7 +23,8 @@
 <body class='bg-gray-50'>
 <div id='root'></div>
 
-<script type='text/babel'>
+<!-- IMPORTANT: data-presets added so JSX compiles on GitHub Pages -->
+<script type='text/babel' data-presets='env,react'>
 const {useState,useEffect,useMemo} = React;
 const BOOKS=[
 {n:'Genesis',c:50},{n:'Exodus',c:40},{n:'Leviticus',c:27},{n:'Numbers',c:36},{n:'Deuteronomy',c:34},
@@ -59,8 +60,8 @@ function dailyDistribution(total,days=365){
 }
 const OT_CHAPTERS = findStart('Matthew'); // 929
 const NT_CHAPTERS = flatten.length - OT_CHAPTERS; // 260
-const otPerDay = dailyDistribution(OT_CHAPTERS,365);     // mostly 2/3 => covers OT once
-const ntPerDay = dailyDistribution(NT_CHAPTERS*2,365);   // 1 or 2 per day => NT twice
+const otPerDay = dailyDistribution(OT_CHAPTERS,365);
+const ntPerDay = dailyDistribution(NT_CHAPTERS*2,365);
 function buildRanges(counts,startIdx){
   const out=[]; let idx=startIdx;
   for(const n of counts){
@@ -94,7 +95,7 @@ function kidsDay(d){
     {label: pp.book==='Psalms'?'Psalm':'Proverb', book:pp.book, start:pp.start, end:pp.end, version:'NIrV'}
   ];
 }
-const KEY='family-bible-reading-v3';
+const KEY='family-bible-reading-v4';
 function load(){ try{return JSON.parse(localStorage.getItem(KEY))||{};}catch{return{};} }
 function save(x){ localStorage.setItem(KEY, JSON.stringify(x)); }
 const defaultProfiles=[
@@ -106,18 +107,18 @@ const defaultProfiles=[
 function dayOfYear(d=new Date()){ const s=new Date(d.getFullYear(),0,1); return Math.floor((d-s)/86400000); }
 
 function App(){
-  const [profiles,setProfiles]=useState(()=> load().profiles||defaultProfiles);
-  const [activeId,setActiveId]=useState(()=> load().activeId||profiles[0].id);
-  const [offset,setOffset]=useState(0);
-  const [today,setToday]=useState(dayOfYear());
-  const [data,setData]=useState(()=>load());
+  const [profiles,setProfiles]=React.useState(()=> load().profiles||defaultProfiles);
+  const [activeId,setActiveId]=React.useState(()=> load().activeId|| (load().profiles||defaultProfiles)[0].id);
+  const [offset,setOffset]=React.useState(0);
+  const [today,setToday]=React.useState(dayOfYear());
+  const [data,setData]=React.useState(()=>load());
 
-  useEffect(()=>{ save({...data,profiles,activeId}); },[data,profiles,activeId]);
+  React.useEffect(()=>{ save({...data,profiles,activeId}); },[data,profiles,activeId]);
 
   const active = profiles.find(p=>p.id===activeId)||profiles[0];
   const idx = (today + offset + 365)%365;
-  const readings = useMemo(()=> active.type==='adult'? adultDay(idx): kidsDay(idx), [active, idx]);
-  const tomorrow = useMemo(()=> active.type==='adult'? adultDay((today+1)%365): kidsDay((today+1)%365), [active, today]);
+  const readings = React.useMemo(()=> active.type==='adult'? adultDay(idx): kidsDay(idx), [active, idx]);
+  const tomorrow = React.useMemo(()=> active.type==='adult'? adultDay((today+1)%365): kidsDay((today+1)%365), [active, today]);
 
   function toggleCard(i, day=today){
     const s=load(); const key=`${activeId}:${day}`; const set=new Set(s.completed?.[key]||[]);
@@ -133,7 +134,7 @@ function App(){
     const completed={...(s.completed||{}), [key]: readings.map((_,i)=>i)};
     setData({...s, completed});
   }
-  const percent = useMemo(()=>{
+  const percent = React.useMemo(()=>{
     const s=load(); let done=0;
     for(let d=0; d<=today; d++){
       const key=`${activeId}:${d}`;
@@ -143,7 +144,7 @@ function App(){
     return Math.round((done/(today+1))*100);
   },[data,active,today]);
 
-  return <div className='max-w-3xl mx-auto px-4 py-6'>
+  return (<div className='max-w-3xl mx-auto px-4 py-6'>
     <header className='flex items-center justify-between mb-4'>
       <div>
         <h1 className='text-2xl font-bold'>Family Bible Reading</h1>
@@ -172,7 +173,7 @@ function App(){
         const url = refToUrl(r.book, r.start, r.end, r.version);
         const kid = active.type==='kid';
         const cls = `p-4 rounded-2xl border ${kid?'kid-card':'adult-card'} ${isDone(i)?'completed':''}`;
-        return <div className={cls} key={i}>
+        return (<div className={cls} key={i}>
           <div className='flex items-center justify-between'>
             <div>
               <div className='text-sm uppercase tracking-wide text-gray-500'>{r.label}</div>
@@ -183,7 +184,7 @@ function App(){
               {isDone(i)?'✅ Done':'Mark complete'}
             </button>
           </div>
-        </div>;
+        </div>);
       })}
     </div>
 
@@ -193,11 +194,11 @@ function App(){
       <div className='grid gap-3 mt-3'>
         {tomorrow.map((r,i)=>{
           const url=refToUrl(r.book,r.start,r.end,r.version);
-          return <div key={i} className='p-3 rounded-xl border bg-gray-50'>
+          return (<div key={i} className='p-3 rounded-xl border bg-gray-50'>
             <div className='text-sm uppercase tracking-wide text-gray-500'>{r.label}</div>
             <div className='font-medium'>{r.start===r.end? `${r.book} ${r.start}` : `${r.book} ${r.start}-${r.end}`}</div>
             <a className='text-xs underline' href={url} target='_blank' rel='noreferrer'>Read now ({r.version})</a>
-          </div>;
+          </div>);
         })}
       </div>
     </div>
@@ -205,10 +206,11 @@ function App(){
     <footer className='text-center text-xs text-gray-500 mt-6'>
       Add to iOS Home Screen: Share → “Add to Home Screen”. Works offline after first load.
     </footer>
-  </div>;
+  </div>);
 }
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
 </script>
+
 <script>
 if('serviceWorker' in navigator){ window.addEventListener('load',()=> navigator.serviceWorker.register('sw.js')); }
 </script>
