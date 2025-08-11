@@ -9,8 +9,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Bible Reading">
   <link rel="apple-touch-icon" href="icons/icon-192x192.png">
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16x16.png">
   <meta name="theme-color" content="#0ea5e9">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
     :root{
       --bg: #f8fafc; --card:#ffffff; --border:#e5e7eb; --text:#0f172a; --muted:#64748b; --accent:#0ea5e9;
@@ -30,7 +32,7 @@
     .card { background: var(--card); border:1px solid var(--border); }
     .adult-card { background: linear-gradient(180deg,var(--adult-start),var(--adult-end)); border:1px solid var(--border); }
     .completed { border-color:#10b981!important; box-shadow:0 0 0 2px #10b98133 inset; }
-    .kid-sticker { width: 96px; height: 96px; border-radius: 24px; object-fit: cover; box-shadow: 0 10px 24px rgba(0,0,0,.18); }
+    .kid-sticker { width: 112px; height: 112px; border-radius: 28px; object-fit: cover; box-shadow: 0 12px 28px rgba(0,0,0,.2); }
     .muted{ color: var(--muted); }
     .bordered{ border:1px solid var(--border); }
     .theme-toggle{ border:1px solid var(--border); }
@@ -40,14 +42,16 @@
     @keyframes fall { to { transform: translate(var(--dx), var(--dy)) rotate(540deg); opacity: 0; } }
     .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
     .modal { background: var(--card); border:1px solid var(--border); border-radius: 16px; max-width: 680px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+    .btn-fun { background: linear-gradient(90deg,#22d3ee,#60a5fa); color: white; border: none; }
   </style>
 </head>
 <body>
   <div class="max-w-3xl mx-auto px-4 py-6">
-    <header class="flex items-center justify-between mb-4">
-      <div>
+    <header class="flex items-center gap-3 mb-4">
+      <img src="header-logo.png" alt="Open Bible" width="40" height="40" class="rounded-xl" />
+      <div class="flex-1">
         <h1 class="text-2xl font-bold">Family Bible Reading</h1>
-        <p class="text-sm muted">Adults (ESV) • Kids (NIrV) • Mixed plan • Links • Per-person progress</p>
+        <p class="text-sm muted">Adults (ESV) • Kids Stories (NIrV)</p>
       </div>
       <div class="text-right">
         <div class="text-sm muted">Progress</div>
@@ -60,8 +64,8 @@
       <select class="bordered rounded p-2 bg-transparent" id="user"></select>
       <button class="ml-auto px-3 py-2 rounded bordered bg-transparent" id="yesterday">← Yesterday</button>
       <button class="px-3 py-2 rounded bordered bg-transparent" id="tomorrow">Tomorrow →</button>
-      <button class="px-3 py-2 rounded bordered bg-transparent" id="prev">◀ Previous suggestion</button>
-      <button class="px-3 py-2 rounded bordered bg-transparent" id="next">Next suggestion ▶</button>
+      <button class="px-3 py-2 rounded bordered bg-transparent" id="prev">◀ Previous</button>
+      <button class="px-3 py-2 rounded bordered bg-transparent" id="next">Next ▶</button>
       <button class="px-3 py-2 rounded bg-green-600 text-white" id="markAll">Mark all complete</button>
       <div class="ml-2">
         <select id="theme" class="theme-toggle rounded p-2 bg-transparent">
@@ -81,8 +85,13 @@
     <div id="cards" class="grid gap-3"></div>
 
     <div class="mt-6 p-4 rounded-2xl card">
-      <div class="text-sm muted">Peek ahead</div>
-      <div class="text-lg font-semibold" id="peekTitle">Tomorrow</div>
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm muted">Peek ahead</div>
+          <div class="text-lg font-semibold" id="peekTitle">Tomorrow</div>
+        </div>
+        <button id="restartStories" class="px-3 py-2 rounded btn-fun hidden">🔄 Restart Story Plan</button>
+      </div>
       <div id="peek" class="grid gap-3 mt-3"></div>
     </div>
 
@@ -112,19 +121,16 @@
   </div>
 
 <script>
-// ---- Theme handling ----
+// ---- Theme ----
 (function(){
   const KEY_THEME='fbr-theme';
-  function applyTheme(val){
-    document.documentElement.setAttribute('data-theme', val||'auto');
-    try{ localStorage.setItem(KEY_THEME, val||'auto'); }catch(e){}
-  }
+  function applyTheme(val){ document.documentElement.setAttribute('data-theme', val||'auto'); try{ localStorage.setItem(KEY_THEME, val||'auto'); }catch(e){} }
   const saved = (function(){ try{return localStorage.getItem(KEY_THEME);}catch(e){return null;}})();
   applyTheme(saved||'auto');
   window._setTheme = applyTheme;
 })();
 
-// ---- Data and helpers ----
+// ---- Book list ----
 const BOOKS=[
   {n:'Genesis',c:50},{n:'Exodus',c:40},{n:'Leviticus',c:27},{n:'Numbers',c:36},{n:'Deuteronomy',c:34},
   {n:'Joshua',c:24},{n:'Judges',c:21},{n:'Ruth',c:4},{n:'1 Samuel',c:31},{n:'2 Samuel',c:24},
@@ -143,111 +149,93 @@ const BOOKS=[
 ];
 const flatten=[]; const bookStartIndex={};
 BOOKS.forEach(b=>{ bookStartIndex[b.n] = flatten.length; for(let i=1;i<=b.c;i++) flatten.push({book:b.n,chapter:i}); });
-const NT_START = bookStartIndex['Matthew'];
-const NT_END = flatten.length;
 
+// ---- Helpers ----
 const refToUrl=(book,st,en,ver)=>{ const r=(en&&en!==st)?`${book} ${st}-${en}`:`${book} ${st}`; return `https://www.biblegateway.com/passage/?search=${encodeURIComponent(r)}&version=${encodeURIComponent(ver)}`; };
 const dayOfYear=(d=new Date())=> Math.floor((d - new Date(d.getFullYear(),0,1))/86400000);
+
+// ---- Adult plan (ESV) ----
 function dailyDistribution(total,days=365){ const out=[]; for(let d=0; d<days; d++){ const t=Math.round(((d+1)*total)/days); const p=Math.round((d*total)/days); out.push(t-p);} return out; }
 function buildRanges(counts,startIdx){ const out=[]; let idx=startIdx; for(const n of counts){ let start=flatten[idx]; let left=n; let last=start; while(left>0 && idx<flatten.length){ last=flatten[idx]; idx++; left--; } out.push({startBook:start.book,startCh:start.chapter,endBook:last.book,endCh:last.chapter}); } return out; }
 function buildRangesLoop(counts, startIdx, endIdx){
-  const out=[]; let idx=startIdx; const len=endIdx-startIdx;
-  for(const n of counts){
-    let start=flatten[idx]; let left = n; let last=start;
-    while(left>0){ last=flatten[idx]; idx++; if(idx>=endIdx) idx=startIdx; left--; }
-    out.push({startBook:start.book,startCh:start.chapter,endBook:last.book,endCh:last.chapter});
-  }
+  const out=[]; let idx=startIdx; for(const n of counts){ let start=flatten[idx]; let left = n; let last=start;
+    while(left>0){ last=flatten[idx]; idx++; if(idx>=endIdx) idx=startIdx; left--; } out.push({startBook:start.book,startCh:start.chapter,endBook:last.book,endCh:last.chapter}); }
   return out;
 }
-
+const NT_START = bookStartIndex['Matthew']; const NT_END = flatten.length;
+const OT_CHAPTERS = NT_START; const NT_CHAPTERS = NT_END - NT_START;
+const otPerDay = dailyDistribution(OT_CHAPTERS,365); const ntPerDay = dailyDistribution(NT_CHAPTERS*2,365);
+const OT_RANGES = buildRanges(otPerDay, 0); const NT_RANGES = buildRangesLoop(ntPerDay, NT_START, NT_END);
 function psPrForDay(d){ if(d%2===0){ const ps=Math.floor(d/2)%150+1; return {book:'Psalms',start:ps,end:ps}; } const pr=Math.floor(d/2)%31+1; return {book:'Proverbs',start:pr,end:pr}; }
-const OT_CHAPTERS = NT_START; // 929
-const NT_CHAPTERS = NT_END - NT_START; // 260
-const otPerDay = dailyDistribution(OT_CHAPTERS,365);
-const ntPerDay = dailyDistribution(NT_CHAPTERS*2,365);
-const OT_RANGES = buildRanges(otPerDay, 0);
-const NT_RANGES = buildRangesLoop(ntPerDay, NT_START, NT_END);
-
 function adultDay(d){ const ot=OT_RANGES[d], nt=NT_RANGES[d], pp=psPrForDay(d);
   return [{label:'Old Testament', book:ot.startBook, start:ot.startCh, end:ot.endCh, version:'ESV'},
           {label:'New Testament', book:nt.startBook, start:nt.startCh, end:nt.endCh, version:'ESV'},
           {label: pp.book==='Psalms'?'Psalm':'Proverb', book:pp.book, start:pp.start, end:pp.end, version:'ESV'}]; }
-function kidsDay(d){ const main = d%2===0? {book:OT_RANGES[d].startBook, start:OT_RANGES[d].startCh, end:OT_RANGES[d].startCh}
-                                          : {book:NT_RANGES[d].startBook, start:NT_RANGES[d].startCh, end:NT_RANGES[d].startCh};
-  const pp=psPrForDay(d);
-  return [{label:'Main Story', book:main.book, start:main.start, end:main.end, version:'NIrV'},
-          {label: pp.book==='Psalms'?'Psalm':'Proverb', book:pp.book, start:pp.start, end:pp.end, version:'NIrV'}]; }
 
-// ---- Summaries ----
-const SHORT_SUMMARY = {
-  Genesis:'Creation & Covenants', Exodus:'Moses & Rescue', Leviticus:'Holiness & Worship', Numbers:'Wilderness Journey', Deuteronomy:'Covenant Renewal',
-  Joshua:'Conquest & Faith', Judges:'Cycles & Deliverers', Ruth:'Kindness & Redemption', '1 Samuel':'Kings & Calling', '2 Samuel':'David’s Reign',
-  '1 Kings':'Kings & Prophets', '2 Kings':'Decline & Exile', '1 Chronicles':'Davidic History', '2 Chronicles':'Reform & Return',
-  Ezra:'Return & Torah', Nehemiah:'Walls & Worship', Esther:'Providence & Courage',
-  Job:'Suffering & Trust', Psalms:'Praise & Prayer', Proverbs:'Wisdom for Life', Ecclesiastes:'Meaning & Time', 'Song of Solomon':'Love & Devotion',
-  Isaiah:'Hope & Holiness', Jeremiah:'Warning & Hope', Lamentations:'Grief & Hope', Ezekiel:'Visions & Restoration', Daniel:'Faith & Kingdom',
-  Hosea:'Faithful Love', Joel:'Day of the Lord', Amos:'Justice & Mercy', Obadiah:'Pride & Fall', Jonah:'Mercy to Nineveh',
-  Micah:'Justice & Hope', Nahum:'Nineveh Judged', Habakkuk:'Faith & Questions', Zephaniah:'Judgment & Joy', Haggai:'Rebuild & Priorities',
-  Zechariah:'Visions & Messiah', Malachi:'Covenant & Promise',
-  Matthew:'Messiah & Kingdom', Mark:'Power & Discipleship', Luke:'Savior for All', John:'Life in Christ', Acts:'Spirit & Mission',
-  Romans:'Gospel & Righteousness', '1 Corinthians':'Church & Cross', '2 Corinthians':'Weakness & Strength',
-  Galatians:'Grace & Freedom', Ephesians:'Church in Christ', Philippians:'Joy in Christ', Colossians:'Christ Supreme',
-  '1 Thessalonians':'Hope & Holiness', '2 Thessalonians':'Christ’s Return',
-  '1 Timothy':'Leaders & Teaching', '2 Timothy':'Finish Faithfully', Titus:'Healthy Church', Philemon:'Forgive & Restore',
-  Hebrews:'Jesus Is Better', James:'Faith & Works', '1 Peter':'Hope in Trials', '2 Peter':'Grow in Grace',
-  '1 John':'Love & Truth', '2 John':'Walk in Truth', '3 John':'Support the Truth', Jude:'Contend for Faith',
-  Revelation:'Victory & New Creation'
-};
+// ---- Kids stories data ----
+const STORIES_OT = [{"title": "Creation", "book": "Genesis", "start": 1, "end": 2, "short": "God creates", "long": "God made the world good and people in His image.", "img": "story-creation.png"}, {"title": "Adam & Eve", "book": "Genesis", "start": 3, "end": 3, "short": "First family", "long": "Adam and Eve disobeyed God, but He promised a Savior.", "img": "ph-adam---eve.png"}, {"title": "Noah\u2019s Ark", "book": "Genesis", "start": 6, "end": 9, "short": "God rescues", "long": "God saved Noah\u2019s family and set a rainbow promise.", "img": "story-noah.png"}, {"title": "Tower of Babel", "book": "Genesis", "start": 11, "end": 11, "short": "Proud tower", "long": "God scattered people by confusing their language.", "img": "ph-tower-of-babel.png"}, {"title": "God\u2019s Promise to Abram", "book": "Genesis", "start": 12, "end": 15, "short": "Stars promise", "long": "God promised Abram a big family to bless the world.", "img": "ph-god-s-promise-to-abram.png"}, {"title": "Joseph\u2019s Dreams", "book": "Genesis", "start": 37, "end": 37, "short": "God at work", "long": "God used Joseph\u2019s trials to save many people.", "img": "ph-joseph-s-dreams.png"}, {"title": "Moses & Burning Bush", "book": "Exodus", "start": 3, "end": 3, "short": "God calls", "long": "God sent Moses to free His people.", "img": "ph-moses---burning-bush.png"}, {"title": "Crossing the Red Sea", "book": "Exodus", "start": 14, "end": 14, "short": "Sea parts", "long": "God rescued Israel through the sea.", "img": "ph-crossing-the-red-sea.png"}, {"title": "Ten Commandments", "book": "Exodus", "start": 20, "end": 20, "short": "God\u2019s ways", "long": "God gave good commands for life.", "img": "ph-ten-commandments.png"}, {"title": "Walls of Jericho", "book": "Joshua", "start": 6, "end": 6, "short": "Walls fall", "long": "God brought the walls down as Israel obeyed.", "img": "ph-walls-of-jericho.png"}, {"title": "Gideon\u2019s Victory", "book": "Judges", "start": 7, "end": 7, "short": "Small but brave", "long": "God saved Israel with a small army.", "img": "ph-gideon-s-victory.png"}, {"title": "David & Goliath", "book": "1 Samuel", "start": 17, "end": 17, "short": "Brave faith", "long": "David trusted God and beat the giant.", "img": "story-david-goliath.png"}, {"title": "Elijah on Mount Carmel", "book": "1 Kings", "start": 18, "end": 18, "short": "God answers", "long": "God showed His power over false gods.", "img": "ph-elijah-on-mount-carmel.png"}, {"title": "Elisha Helps", "book": "2 Kings", "start": 4, "end": 4, "short": "Kind miracles", "long": "God cared for people through Elisha.", "img": "ph-elisha-helps.png"}, {"title": "Queen Esther", "book": "Esther", "start": 4, "end": 7, "short": "For such time", "long": "God used Esther to protect His people.", "img": "ph-queen-esther.png"}, {"title": "Daniel in Lions\u2019 Den", "book": "Daniel", "start": 6, "end": 6, "short": "God protects", "long": "God kept Daniel safe with the lions.", "img": "ph-daniel-in-lions--den.png"}, {"title": "Jonah & Big Fish", "book": "Jonah", "start": 1, "end": 2, "short": "Second chance", "long": "God gave Jonah and Nineveh mercy.", "img": "story-jonah.png"}];
+const STORIES_NT = [{"title": "Jesus Is Born", "book": "Luke", "start": 2, "end": 2, "short": "Savior born", "long": "Jesus was born in Bethlehem\u2014good news of great joy!", "img": "story-nativity.png"}, {"title": "Boy Jesus at the Temple", "book": "Luke", "start": 2, "end": 41, "short": "Growing in wisdom", "long": "Jesus loved His Father\u2019s house.", "img": "ph-boy-jesus-at-the-temple.png"}, {"title": "Baptism of Jesus", "book": "Matthew", "start": 3, "end": 3, "short": "Loved Son", "long": "The Father said, \u201cThis is my beloved Son.\u201d", "img": "ph-baptism-of-jesus.png"}, {"title": "Jesus Calms the Storm", "book": "Mark", "start": 4, "end": 35, "short": "Peace be still", "long": "Jesus spoke and the sea became calm.", "img": "ph-jesus-calms-the-storm.png"}, {"title": "Feeding 5,000", "book": "John", "start": 6, "end": 1, "short": "God provides", "long": "Jesus fed a crowd with little food.", "img": "ph-feeding-5-000.png"}, {"title": "Good Samaritan", "book": "Luke", "start": 10, "end": 25, "short": "Love neighbors", "long": "Jesus taught us to show mercy.", "img": "ph-good-samaritan.png"}, {"title": "Prodigal Son", "book": "Luke", "start": 15, "end": 11, "short": "Father\u2019s love", "long": "The father welcomed his son home with joy.", "img": "ph-prodigal-son.png"}, {"title": "Good Shepherd", "book": "John", "start": 10, "end": 1, "short": "Jesus cares", "long": "Jesus knows and leads His sheep.", "img": "ph-good-shepherd.png"}, {"title": "Zacchaeus", "book": "Luke", "start": 19, "end": 1, "short": "Changed heart", "long": "Jesus welcomed Zacchaeus; his life changed.", "img": "ph-zacchaeus.png"}, {"title": "Palm Sunday", "book": "Matthew", "start": 21, "end": 1, "short": "Hail the King", "long": "Jesus entered Jerusalem as promised King.", "img": "ph-palm-sunday.png"}, {"title": "Last Supper", "book": "Luke", "start": 22, "end": 7, "short": "New covenant", "long": "Jesus gave bread and cup to remember Him.", "img": "ph-last-supper.png"}, {"title": "Cross & Resurrection", "book": "Luke", "start": 23, "end": 24, "short": "Jesus wins", "long": "Jesus died and rose to save us.", "img": "ph-cross---resurrection.png"}, {"title": "Doubting Thomas", "book": "John", "start": 20, "end": 24, "short": "Believe & see", "long": "Jesus showed His wounds; Thomas believed.", "img": "ph-doubting-thomas.png"}, {"title": "Great Commission", "book": "Matthew", "start": 28, "end": 16, "short": "Go and tell", "long": "Jesus sent us to make disciples.", "img": "ph-great-commission.png"}, {"title": "Pentecost", "book": "Acts", "start": 2, "end": 1, "short": "Spirit comes", "long": "God sent the Holy Spirit to the church.", "img": "ph-pentecost.png"}, {"title": "Peter in Prison", "book": "Acts", "start": 12, "end": 1, "short": "God sets free", "long": "An angel rescued Peter from chains.", "img": "ph-peter-in-prison.png"}, {"title": "Paul\u2019s Conversion", "book": "Acts", "start": 9, "end": 1, "short": "New start", "long": "Jesus met Saul; he became Paul.", "img": "ph-paul-s-conversion.png"}, {"title": "Paul & Silas Sing", "book": "Acts", "start": 16, "end": 16, "short": "Joy in jail", "long": "God shook the prison; the jailer believed.", "img": "ph-paul---silas-sing.png"}, {"title": "Armor of God", "book": "Ephesians", "start": 6, "end": 10, "short": "Stand strong", "long": "God gives armor to live for Him.", "img": "ph-armor-of-god.png"}, {"title": "Fruit of the Spirit", "book": "Galatians", "start": 5, "end": 22, "short": "Grow like Jesus", "long": "The Spirit grows love and joy in us.", "img": "ph-fruit-of-the-spirit.png"}];
 
-function longSummaryFor(book){
-  const M = {
-    Torah: 'God forms a people through covenant, rescue, and instruction. These books reveal God’s character, humanity’s need, and a way to live with Him.',
-    History: 'God’s faithfulness across generations—victories, failures, exile, and return. The story shows the cost of sin and the steadiness of God’s promises.',
-    Wisdom: 'Poetry and wisdom for real life—prayer, praise, suffering, meaning, and love—teaching hearts to trust and live skillfully.',
-    Prophets: 'God calls His people back through warnings and hope. The prophets expose sin, promise restoration, and point to the coming Messiah.',
-    Gospels: 'The life, death, and resurrection of Jesus—the promised King who brings God’s kingdom near and invites us to follow Him.',
-    Acts: 'The risen Jesus sends the Spirit. The church grows, suffers, and carries the gospel to the nations.',
-    Epistles: 'Letters to help churches follow Jesus—clear teaching, correction, encouragement, and hope.',
-    Revelation: 'Jesus reigns. Evil will not win. God will make all things new—so the church endures with courage and worship.'
-  };
-  const group = (function(b){
-    if(['Genesis','Exodus','Leviticus','Numbers','Deuteronomy'].includes(b)) return 'Torah';
-    if(['Job','Psalms','Proverbs','Ecclesiastes','Song of Solomon'].includes(b)) return 'Wisdom';
-    if(['Joshua','Judges','Ruth','1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra','Nehemiah','Esther'].includes(b)) return 'History';
-    if(['Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel','Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi'].includes(b)) return 'Prophets';
-    if(['Matthew','Mark','Luke','John'].includes(b)) return 'Gospels';
-    if(b==='Acts') return 'Acts';
-    if(['Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude'].includes(b)) return 'Epistles';
-    if(b==='Revelation') return 'Revelation';
-    return 'History';
-  })(book);
-  return M[group];
-}
-
-// Storage / State
-const KEY='family-bible-reading-summaries-v2';
+// ---- State (new key resets kids progress) ----
+const KEY='fbr-full2-otnt-stories';
 function load(){ try{return JSON.parse(localStorage.getItem(KEY))||{};}catch{return{};} }
 function save(x){ localStorage.setItem(KEY, JSON.stringify(x)); }
 const defaultProfiles=[{id:'dad',name:'Dad',type:'adult'},{id:'mom',name:'Mom',type:'adult'},{id:'elle',name:'Elle',type:'kid'},{id:'lainey',name:'Lainey',type:'kid'}];
+let S = Object.assign({profiles: defaultProfiles, activeId:'dad', offset:0, completed:{}, view:'single',
+  kidsCycle:{ otOrder:[], ntOrder:[], otIdx:0, ntIdx:0 }
+}, load());
 
-let S = Object.assign({profiles: defaultProfiles, activeId:'dad', offset:0, completed:{}, view:'single'}, load());
-if(!Array.isArray(S.profiles) || S.profiles.length===0) S.profiles = defaultProfiles.slice();
-if(!S.activeId || !S.profiles.some(p=>p.id===S.activeId)) S.activeId = S.profiles[0].id;
-if(typeof S.offset !== 'number' || isNaN(S.offset)) S.offset = 0;
-if(!S.completed || typeof S.completed!=='object') S.completed = {};
-S.today = dayOfYear();
-if(!S.view) S.view='single';
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+function ensureOrders(){
+  if(!S.kidsCycle) S.kidsCycle={ otOrder:[], ntOrder:[], otIdx:0, ntIdx:0 };
+  if(!Array.isArray(S.kidsCycle.otOrder) || S.kidsCycle.otOrder.length!==STORIES_OT.length){ S.kidsCycle.otOrder = shuffle([...Array(STORIES_OT.length).keys()]); S.kidsCycle.otIdx=0; }
+  if(!Array.isArray(S.kidsCycle.ntOrder) || S.kidsCycle.ntOrder.length!==STORIES_NT.length){ S.kidsCycle.ntOrder = shuffle([...Array(STORIES_NT.length).keys()]); S.kidsCycle.ntIdx=0; }
+}
+ensureOrders();
 
-function isDone(pid, day, i){ const arr = S.completed[pid+':'+day]||[]; return arr.indexOf(i)!==-1; }
-function toggle(pid, day, i){ const k=pid+':'+day; const set=new Set(S.completed[k]||[]); if(set.has(i)) set.delete(i); else set.add(i); S.completed[k]=Array.from(set); save(S); confetti(); render(); }
-function markAll(pid, day, len){ S.completed[pid+':'+day]=Array.from({length:len},(_,i)=>i); save(S); confetti(); render(); }
-function percent(pid, type){ let done=0; for(let d=0; d<=S.today; d++){ const key=pid+':'+d; const need=(type==='adult'?3:2); if((S.completed[key]||[]).length>=need) done++; } return Math.round((done/(S.today+1))*100); }
-function current(profile, day){ return profile.type==='adult' ? adultDay(day) : kidsDay(day); }
-function fmt(r){ return r.start===r.end? `${r.book} ${r.start}`:`${r.book} ${r.start}-${r.end}`; }
-function imgFor(i){ const n=(i%6)+1; return `images/kid-${n}.png`; }
+function toRef(book,start,end){ return start===end? (book+' '+start) : (book+' '+start+'-'+end); }
+
+// selector: alternate OT/NT by calendar day parity, always start with OT today
+function kidsToday(){
+  ensureOrders();
+  const parity = (dayOfYear() + S.offset + 3650) % 2; // 0 OT, 1 NT
+  if(parity===0){
+    if(S.kidsCycle.otIdx>=STORIES_OT.length){ S.kidsCycle.otOrder=shuffle(S.kidsCycle.otOrder); S.kidsCycle.otIdx=0; }
+    const st = STORIES_OT[S.kidsCycle.otOrder[S.kidsCycle.otIdx]];
+    return Object.assign({side:'OT'}, st);
+  }else{
+    if(S.kidsCycle.ntIdx>=STORIES_NT.length){ S.kidsCycle.ntOrder=shuffle(S.kidsCycle.ntOrder); S.kidsCycle.ntIdx=0; }
+    const st = STORIES_NT[S.kidsCycle.ntOrder[S.kidsCycle.ntIdx]];
+    return Object.assign({side:'NT'}, st);
+  }
+}
+function kidsTomorrow(){
+  const parity = (dayOfYear() + S.offset + 1 + 3650) % 2;
+  if(parity===0){
+    const id = (S.kidsCycle.otIdx>=STORIES_OT.length?0:S.kidsCycle.otIdx);
+    return Object.assign({side:'OT'}, STORIES_OT[S.kidsCycle.otOrder[id]]);
+  }else{
+    const id = (S.kidsCycle.ntIdx>=STORIES_NT.length?0:S.kidsCycle.ntIdx);
+    return Object.assign({side:'NT'}, STORIES_NT[S.kidsCycle.ntOrder[id]]);
+  }
+}
+
+// advance when a kid marks complete (increments index for that side)
+function advanceKids(side){
+  if(side==='OT'){ S.kidsCycle.otIdx++; } else { S.kidsCycle.ntIdx++; }
+  save(S);
+}
+
+// completion
+function isDone(pid, day, i){ const arr=S.completed[pid+':'+day]||[]; return arr.indexOf(i)!==-1; }
+function toggle(pid, day, i, meta){ const k=pid+':'+day; const set=new Set(S.completed[k]||[]); if(set.has(i)) set.delete(i); else set.add(i); S.completed[k]=Array.from(set); save(S); if(meta&&meta.side){ advanceKids(meta.side); } confetti(); render(); }
+function markAll(pid, day, len, meta){ S.completed[pid+':'+day]=Array.from({length:len},(_,i)=>i); save(S); if(meta&&meta.side){ advanceKids(meta.side); } confetti(); render(); }
+function percent(pid, type){ let done=0; for(let d=0; d<=dayOfYear(); d++){ const key=pid+':'+d; const need=(type==='adult'?3:1); if((S.completed[key]||[]).length>=need) done++; } return Math.round((done/(dayOfYear()+1))*100); }
+
+// confetti
 function confetti(){ const host=document.getElementById('confetti'); if(!host) return; const pieces=16; const W=window.innerWidth, H=window.innerHeight; for(let i=0;i<pieces;i++){ const s=document.createElement('div'); s.className='piece'; s.style.left=(W/2)+'px'; s.style.top=(H/3)+'px'; const dx=(Math.random()*2-1)*W*0.6; const dy=H*(0.6+Math.random()*0.4); s.style.setProperty('--dx', dx+'px'); s.style.setProperty('--dy', dy+'px'); s.textContent = ['🎉','✨','🌟','💫','🎈','🟡','🟣','🔵'][i%8]; host.appendChild(s); setTimeout(()=> host.removeChild(s), 1300);} }
 
-// UI helpers
+// modal
 function openModal(imgSrc, title, ref, body, link){
   const bg = document.getElementById('modalBg');
   document.getElementById('modalImg').src = imgSrc||'';
@@ -260,57 +248,42 @@ function openModal(imgSrc, title, ref, body, link){
 document.getElementById('modalClose').onclick = ()=>{ document.getElementById('modalBg').style.display='none'; };
 document.getElementById('modalBg').onclick = (e)=>{ if(e.target.id==='modalBg'){ e.currentTarget.style.display='none'; } };
 
-function shortSummaryFor(book){
-  return SHORT_SUMMARY[book] || 'Read & Reflect';
-}
-function longSummaryForBook(book){
-  return longSummaryFor(book);
-}
-function makeShortPill(text, onClick){
-  const pill = document.createElement('span');
-  pill.className = 'short-pill';
-  pill.textContent = text;
-  pill.onclick = onClick;
-  return pill;
-}
-
-// Overview toggle
+// controls
 (function(){
   const viewSel = document.getElementById('overview');
-  viewSel.value = S.view || 'single';
+  viewSel.value = (load().view || 'single');
   viewSel.onchange = e=>{ S.view = e.target.value; save(S); render(); };
+  const themeSel=document.getElementById('theme');
+  try{ themeSel.value = localStorage.getItem('fbr-theme')||'auto'; }catch(e){ themeSel.value='auto'; }
+  themeSel.onchange = (e)=>{ const v=e.target.value||'auto'; if(window._setTheme) window._setTheme(v); };
 })();
 
-// Theme select
-(function(){
-  const sel = document.getElementById('theme');
-  try{
-    const saved = localStorage.getItem('fbr-theme') || 'auto';
-    sel.value = saved;
-  }catch(e){ sel.value = 'auto'; }
-  sel.onchange = (e)=>{
-    const v = e.target.value || 'auto';
-    if(window._setTheme) window._setTheme(v);
-  };
-})();
-
-function addSummaryPill(container, r, isKid, i){
-  const short = shortSummaryFor(r.book);
-  const pill = makeShortPill(short, ()=>{
-    const img = isKid ? imgFor(i) : '';
-    const title = short;
-    const ref = fmt(r);
-    const body = longSummaryForBook(r.book);
-    openModal(img, title, ref, body, refToUrl(r.book,r.start,r.end,r.version));
-  });
-  const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide muted'; tag.textContent=r.label;
-  const topRow=document.createElement('div'); topRow.className='flex items-center gap-2';
-  topRow.appendChild(tag); topRow.appendChild(pill);
-  container.appendChild(topRow);
+// restart button (parents only in kids overview)
+function showRestartIfParent(){
+  const btn = document.getElementById('restartStories');
+  const p = S.profiles.find(x=>x.id===S.activeId)||S.profiles[0];
+  if(S.view==='kids' && p.type==='adult'){
+    btn.classList.remove('hidden');
+    btn.onclick = ()=>{
+      if(confirm('Restart kids story plan? This resets Elle and Lainey progress and reshuffles stories.')){
+        S.completed = {};
+        S.kidsCycle = { otOrder:[], ntOrder:[], otIdx:0, ntIdx:0 };
+        ensureOrders();
+        save(S);
+        render();
+      }
+    };
+  }else{
+    btn.classList.add('hidden');
+  }
 }
 
-// Rendering
-function renderSingle(){
+// render helpers
+function shortPill(text, onClick){ const s=document.createElement('span'); s.className='short-pill'; s.textContent=text; s.onclick=onClick; return s; }
+function toRef(book,start,end){ return start===end? (book+' '+start) : (book+' '+start+'-'+end); }
+
+function render(){
+  showRestartIfParent();
   const userSel = document.getElementById('user');
   userSel.innerHTML='';
   S.profiles.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; if(p.id===S.activeId) o.selected=true; userSel.appendChild(o); });
@@ -318,132 +291,112 @@ function renderSingle(){
 
   const p = S.profiles.find(x=>x.id===S.activeId)||S.profiles[0];
   document.getElementById('progressPct').textContent = percent(p.id, p.type)+'%';
-  const idx = (S.today + S.offset + 365)%365;
-  const readings = current(p, idx);
-
   const cards = document.getElementById('cards');
   cards.innerHTML='';
-  readings.forEach((r,i)=>{
-    const card=document.createElement('div');
-    const kid = p.type==='kid';
-    card.className='p-4 rounded-2xl '+(kid?'card':'adult-card')+(isDone(p.id,S.today,i)?' completed':'');
 
-    const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between';
-
-    const left=document.createElement('div'); left.className='flex-1';
-    addSummaryPill(left, r, kid, i);
-    const titleEl=document.createElement('div'); titleEl.className='text-xl font-semibold'; titleEl.textContent=fmt(r);
-    const a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
-    left.appendChild(titleEl); left.appendChild(a);
-
-    if(kid){
-      const img=document.createElement('img'); img.src=imgFor(i); img.alt='Sticker'; img.className='kid-sticker';
-      row.appendChild(img);
-    }
-
-    const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,S.today,i)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(p.id,S.today,i)?'✅ Done':'Mark complete';
-    btn.onclick=()=> toggle(p.id,S.today,i);
-
-    row.appendChild(left);
-    row.appendChild(btn);
-    card.appendChild(row);
-    cards.appendChild(card);
-  });
-
-  document.getElementById('peekTitle').textContent = p.type==='adult' ? 'Tomorrow (Adults • ESV)' : 'Tomorrow (Kids • NIrV)';
-  const peek = document.getElementById('peek');
-  peek.innerHTML='';
-  const tmr = current(p, (S.today+1)%365);
-  tmr.forEach((r,i)=>{
-    const row=document.createElement('div'); row.className='p-3 rounded-xl card flex items-center justify-between gap-4';
-    const left=document.createElement('div');
-    addSummaryPill(left, r, p.type==='kid', i+1);
-    const l2=document.createElement('div'); l2.className='font-medium'; l2.textContent=fmt(r);
-    const a=document.createElement('a'); a.className='text-xs underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
-    left.appendChild(l2); left.appendChild(a);
-    if(p.type==='kid'){ const img=document.createElement('img'); img.src=imgFor(i+1); img.alt='Sticker'; img.className='kid-sticker'; row.appendChild(img); }
-    row.appendChild(left);
-    peek.appendChild(row);
-  });
-}
-
-function renderKidsOverview(){
-  const cards = document.getElementById('cards');
-  cards.innerHTML='';
-  const kids = S.profiles.filter(x=>x.type==='kid');
-  const wrap = document.createElement('div'); wrap.className='grid md:grid-cols-2 gap-4';
-  cards.appendChild(wrap);
-
-  kids.forEach((kidP, colIdx)=>{
-    const box = document.createElement('div'); box.className='p-4 rounded-2xl card';
-    const h = document.createElement('div'); h.className='flex items-center justify-between mb-2';
-    const t = document.createElement('div'); t.innerHTML = '<div class="text-sm uppercase tracking-wide muted">Today</div><div class="text-lg font-semibold">'+kidP.name+'</div>';
-    const pct = document.createElement('div'); pct.className='text-sm muted'; pct.textContent = percent(kidP.id, kidP.type)+'%';
-    h.appendChild(t); h.appendChild(pct); box.appendChild(h);
-
-    const idx = (S.today + S.offset + 365)%365;
-    const readings = current(kidP, idx);
-    readings.forEach((r,i)=>{
-      const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between p-3 rounded-xl bordered mb-2';
-      const left=document.createElement('div'); left.className='flex-1';
-      addSummaryPill(left, r, true, i+colIdx);
-      const l2=document.createElement('div'); l2.className='font-medium'; l2.textContent=fmt(r);
-      const a=document.createElement('a'); a.className='text-xs underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
-      left.appendChild(l2); left.appendChild(a);
-      const img=document.createElement('img'); img.src=imgFor(i+colIdx+1); img.alt='Sticker'; img.className='kid-sticker';
-      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(kidP.id,S.today,i)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(kidP.id,S.today,i)?'✅ Done':'Mark complete';
-      btn.onclick=()=> toggle(kidP.id,S.today,i);
-      row.appendChild(img); row.appendChild(left); row.appendChild(btn);
-      box.appendChild(row);
-    });
-
-    wrap.appendChild(box);
-  });
-
-  // Peek section for overview
-  const peekWrap = document.createElement('div'); peekWrap.className='mt-4 p-4 rounded-2xl card';
-  const title = document.createElement('div'); title.className='text-sm muted'; title.textContent='Peek ahead (Kids)';
-  peekWrap.appendChild(title);
-  const grid = document.createElement('div'); grid.className='grid md:grid-cols-2 gap-3 mt-3'; peekWrap.appendChild(grid);
-  kids.forEach((kidP, colIdx)=>{
-    const col = document.createElement('div'); col.className='rounded-xl p-3 bordered';
-    const name = document.createElement('div'); name.className='font-semibold mb-1'; name.textContent = kidP.name;
-    col.appendChild(name);
-    const tmr = current(kidP, (S.today+1)%365);
-    tmr.forEach((r,i)=>{
-      const row=document.createElement('div'); row.className='flex items-center gap-3 justify-between p-2 rounded-lg bordered mb-2';
-      const left=document.createElement('div'); left.className='flex-1';
-      addSummaryPill(left, r, true, i+colIdx+2);
-      const l2=document.createElement('div'); l2.className='text-sm'; l2.textContent=fmt(r);
-      left.appendChild(l2);
-      const img=document.createElement('img'); img.src=imgFor(i+colIdx+2); img.alt='Sticker'; img.className='kid-sticker';
-      row.appendChild(img); row.appendChild(left);
-      col.appendChild(row);
-    });
-    grid.appendChild(col);
-  });
-
-  cards.appendChild(peekWrap);
-}
-
-function render(){
-  const viewSel = document.getElementById('overview');
-  if(S.view==='kids'){ viewSel.value='kids'; }
-  else { viewSel.value='single'; }
-
-  // Wire buttons
-  document.getElementById('yesterday').onclick = ()=>{ S.today=(S.today+364)%365; render(); };
-  document.getElementById('tomorrow').onclick  = ()=>{ S.today=(S.today+1)%365; render(); };
+  // Wire nav (prev/next just slide offset)
+  document.getElementById('yesterday').onclick = ()=>{ S.offset--; render(); };
+  document.getElementById('tomorrow').onclick  = ()=>{ S.offset++; render(); };
   document.getElementById('prev').onclick      = ()=>{ S.offset--; render(); };
   document.getElementById('next').onclick      = ()=>{ S.offset++; render(); };
-  document.getElementById('markAll').onclick   = ()=>{ const p = S.profiles.find(x=>x.id===S.activeId)||S.profiles[0]; const r=current(p, (S.today+S.offset+365)%365); markAll(p.id, S.today, r.length); };
+  document.getElementById('markAll').onclick   = ()=>{
+    if(p.type==='adult'){ const r=adultDay((dayOfYear()+S.offset+365)%365); markAll(p.id, dayOfYear(), r.length); }
+    else { const t=kidsToday(); markAll(p.id, dayOfYear(), 1, {side:t.side}); }
+  };
 
   if(S.view==='kids'){
-    renderKidsOverview();
-    document.getElementById('peekTitle').textContent = 'Tomorrow';
-    document.getElementById('peek').innerHTML='';
-  }else{
-    renderSingle();
+    // Kids Overview for parents
+    const kids = S.profiles.filter(x=>x.type==='kid');
+    const today = kidsToday();
+    kids.forEach(child=>{
+      const st = today;
+      const card=document.createElement('div'); card.className='p-4 rounded-2xl card';
+      const head=document.createElement('div'); head.className='flex items-center gap-3 mb-2';
+      const img=document.createElement('img'); img.src='images/'+st.img; img.alt=st.title; img.className='kid-sticker';
+      const title=document.createElement('div'); title.innerHTML = '<div class="text-sm uppercase tracking-wide muted">'+child.name+'</div><div class="text-lg font-semibold">'+st.title+'</div>';
+      head.appendChild(img); head.appendChild(title); card.appendChild(head);
+
+      const ref=document.createElement('div'); ref.className='font-medium'; ref.textContent = toRef(st.book, st.start, st.end);
+      const link=document.createElement('a'); link.className='text-sm underline'; link.href=refToUrl(st.book, st.start, st.end, 'NIrV'); link.target='_blank'; link.rel='noreferrer'; link.textContent='Read now (NIrV)';
+      const pill=shortPill(st.short, ()=>openModal('images/'+st.img, st.title, ref.textContent, st.long, link.href));
+
+      const row=document.createElement('div'); row.className='flex items-center justify-between mt-2';
+      const left=document.createElement('div'); left.appendChild(pill); left.appendChild(document.createElement('div')).appendChild(link);
+      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(child.id,dayOfYear(),0)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(child.id,dayOfYear(),0)?'✅ Done':'Mark complete';
+      btn.onclick=()=> toggle(child.id, dayOfYear(), 0, {side:st.side});
+
+      card.appendChild(ref);
+      row.appendChild(left); row.appendChild(btn);
+      card.appendChild(row);
+
+      cards.appendChild(card);
+    });
+
+    // Peek tomorrow
+    document.getElementById('peekTitle').textContent = 'Tomorrow (Kids story)';
+    const peek=document.getElementById('peek'); peek.innerHTML='';
+    const st2 = kidsTomorrow();
+    const prow=document.createElement('div'); prow.className='p-3 rounded-xl card flex items-center gap-3';
+    const pimg=document.createElement('img'); pimg.src='images/'+st2.img; pimg.alt=st2.title; pimg.className='kid-sticker';
+    const l=document.createElement('div');
+    const l1=document.createElement('div'); l1.className='text-sm uppercase tracking-wide muted'; l1.textContent='Bible Story';
+    const l2=document.createElement('div'); l2.className='font-medium'; l2.textContent=st2.title+' — '+toRef(st2.book, st2.start, st2.end);
+    l.appendChild(l1); l.appendChild(l2); prow.appendChild(pimg); prow.appendChild(l); peek.appendChild(prow);
+  } else {
+    if(p.type==='adult'){
+      const readings = adultDay((dayOfYear()+S.offset+365)%365);
+      readings.forEach((r,i)=>{
+        const card=document.createElement('div'); card.className='p-4 rounded-2xl adult-card'+(isDone(p.id,dayOfYear(),i)?' completed':'');
+        const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between';
+        const left=document.createElement('div'); left.className='flex-1';
+        const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide muted'; tag.textContent=r.label;
+        const pill=shortPill((r.book==='Psalms'?'Praise & Prayer':(r.book==='Proverbs'?'Wisdom for Life':'Read & Reflect')), ()=>openModal('', r.label, toRef(r.book, r.start, r.end), 'A reading to know God and walk with Him.', refToUrl(r.book,r.start,r.end,r.version)));
+        const title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=toRef(r.book, r.start, r.end);
+        const a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
+        left.appendChild(tag); left.appendChild(pill); left.appendChild(title); left.appendChild(a);
+        const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,dayOfYear(),i)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(p.id,dayOfYear(),i)?'✅ Done':'Mark complete';
+        btn.onclick=()=> toggle(p.id, dayOfYear(), i);
+        row.appendChild(left); row.appendChild(btn);
+        card.appendChild(row); cards.appendChild(card);
+      });
+      document.getElementById('peekTitle').textContent = 'Tomorrow (Adults • ESV)';
+      const peek=document.getElementById('peek'); peek.innerHTML='';
+      adultDay((dayOfYear()+S.offset+1+365)%365).forEach((r,i)=>{
+        const row=document.createElement('div'); row.className='p-3 rounded-xl card flex items-center justify-between gap-4';
+        const l=document.createElement('div');
+        const l1=document.createElement('div'); l1.className='text-sm uppercase tracking-wide muted'; l1.textContent=r.label;
+        const pill=shortPill((r.book==='Psalms'?'Praise & Prayer':(r.book==='Proverbs'?'Wisdom for Life':'Read & Reflect')), ()=>openModal('', r.label, toRef(r.book, r.start, r.end), 'A reading to know God and walk with Him tomorrow.', refToUrl(r.book,r.start,r.end,r.version)));
+        const l2=document.createElement('div'); l2.className='font-medium'; l2.textContent=toRef(r.book, r.start, r.end);
+        const a=document.createElement('a'); a.className='text-xs underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
+        l.appendChild(l1); l.appendChild(pill); l.appendChild(l2); l.appendChild(a);
+        row.appendChild(l); peek.appendChild(row);
+      });
+    } else {
+      const st = kidsToday();
+      const card=document.createElement('div'); card.className='p-4 rounded-2xl card'+(isDone(p.id,dayOfYear(),0)?' completed':'');
+      const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between';
+      const left=document.createElement('div'); left.className='flex-1';
+      const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide muted'; tag.textContent='Bible Story';
+      const pill=shortPill(st.short, ()=>openModal('images/'+st.img, st.title, toRef(st.book, st.start, st.end), st.long, refToUrl(st.book,st.start,st.end,'NIrV')));
+      const title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=st.title+' — '+toRef(st.book, st.start, st.end);
+      const a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(st.book,st.start,st.end,'NIrV'); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now (NIrV)';
+      left.appendChild(tag); left.appendChild(pill); left.appendChild(title); left.appendChild(a);
+      const img=document.createElement('img'); img.src='images/'+st.img; img.alt=st.title; img.className='kid-sticker';
+      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,dayOfYear(),0)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(p.id,dayOfYear(),0)?'✅ Done':'Mark complete';
+      btn.onclick=()=> toggle(p.id, dayOfYear(), 0, {side:st.side});
+      row.appendChild(img); row.appendChild(left); row.appendChild(btn);
+      card.appendChild(row); cards.appendChild(card);
+
+      document.getElementById('peekTitle').textContent = 'Tomorrow (Kids story)';
+      const peek=document.getElementById('peek'); peek.innerHTML='';
+      const st2 = kidsTomorrow();
+      const prow=document.createElement('div'); prow.className='p-3 rounded-xl card flex items-center gap-3';
+      const pimg=document.createElement('img'); pimg.src='images/'+st2.img; pimg.alt=st2.title; pimg.className='kid-sticker';
+      const l=document.createElement('div');
+      const l1=document.createElement('div'); l1.className='text-sm uppercase tracking-wide muted'; l1.textContent='Bible Story';
+      const l2=document.createElement('div'); l2.className='font-medium'; l2.textContent=st2.title+' — '+toRef(st2.book, st2.start, st2.end);
+      l.appendChild(l1); l.appendChild(l2); prow.appendChild(pimg); prow.appendChild(l); peek.appendChild(prow);
+    }
   }
 }
 render();
