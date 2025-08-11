@@ -43,7 +43,23 @@
     .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
     .modal { background: var(--card); border:1px solid var(--border); border-radius: 16px; max-width: 680px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
     .btn-fun { background: linear-gradient(90deg,#22d3ee,#60a5fa); color: white; border: none; }
-  </style>
+  /* iPhone portrait optimizations for Kids cards (baked-in) */
+@media (max-width: 420px){
+  .kid-sticker{ width:84px; height:84px; border-radius:20px; }
+  .kid-row{ flex-direction: column; align-items: stretch; gap:12px; }
+  .kid-left > .short-pill{ 
+    display:inline-block; 
+    font-size:14px; 
+    line-height:1.2; 
+    padding:6px 10px; 
+    max-width:100%; 
+    white-space:normal;
+  }
+  .kid-left a.underline{ display:inline-block; margin-top:6px; }
+  .kid-btn{ width:100%; padding:12px 14px; font-size:16px; }
+  #peek .kid-sticker{ width:72px; height:72px; border-radius:16px; }
+}
+</style>
 </head>
 <body>
   <div class="max-w-3xl mx-auto px-4 py-6">
@@ -320,9 +336,9 @@ function render(){
       const link=document.createElement('a'); link.className='text-sm underline'; link.href=refToUrl(st.book, st.start, st.end, 'NIrV'); link.target='_blank'; link.rel='noreferrer'; link.textContent='Read now (NIrV)';
       const pill=shortPill(st.short, ()=>openModal('images/'+st.img, st.title, ref.textContent, st.long, link.href));
 
-      const row=document.createElement('div'); row.className='flex items-center justify-between mt-2';
-      const left=document.createElement('div'); left.appendChild(pill); left.appendChild(document.createElement('div')).appendChild(link);
-      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(child.id,dayOfYear(),0)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(child.id,dayOfYear(),0)?'✅ Done':'Mark complete';
+      const row=document.createElement('div'); row.className='flex items-center justify-between mt-2 kid-row';
+      const left=document.createElement('div'); left.className='kid-left'; left.appendChild(pill); left.appendChild(document.createElement('div')).appendChild(link);
+      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded kid-btn '+(isDone(child.id,dayOfYear(),0)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(child.id,dayOfYear(),0)?'✅ Done':'Mark complete';
       btn.onclick=()=> toggle(child.id, dayOfYear(), 0, {side:st.side});
 
       card.appendChild(ref);
@@ -347,8 +363,8 @@ function render(){
       const readings = adultDay((dayOfYear()+S.offset+365)%365);
       readings.forEach((r,i)=>{
         const card=document.createElement('div'); card.className='p-4 rounded-2xl adult-card'+(isDone(p.id,dayOfYear(),i)?' completed':'');
-        const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between';
-        const left=document.createElement('div'); left.className='flex-1';
+        const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between kid-row';
+        const left=document.createElement('div'); left.className='flex-1 kid-left';
         const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide muted'; tag.textContent=r.label;
         const pill=shortPill((r.book==='Psalms'?'Praise & Prayer':(r.book==='Proverbs'?'Wisdom for Life':'Read & Reflect')), ()=>openModal('', r.label, toRef(r.book, r.start, r.end), 'A reading to know God and walk with Him.', refToUrl(r.book,r.start,r.end,r.version)));
         const title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=toRef(r.book, r.start, r.end);
@@ -374,15 +390,15 @@ function render(){
     } else {
       const st = kidsToday();
       const card=document.createElement('div'); card.className='p-4 rounded-2xl card'+(isDone(p.id,dayOfYear(),0)?' completed':'');
-      const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between';
-      const left=document.createElement('div'); left.className='flex-1';
+      const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between kid-row';
+      const left=document.createElement('div'); left.className='flex-1 kid-left';
       const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide muted'; tag.textContent='Bible Story';
       const pill=shortPill(st.short, ()=>openModal('images/'+st.img, st.title, toRef(st.book, st.start, st.end), st.long, refToUrl(st.book,st.start,st.end,'NIrV')));
       const title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=st.title+' — '+toRef(st.book, st.start, st.end);
       const a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(st.book,st.start,st.end,'NIrV'); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now (NIrV)';
       left.appendChild(tag); left.appendChild(pill); left.appendChild(title); left.appendChild(a);
       const img=document.createElement('img'); img.src='images/'+st.img; img.alt=st.title; img.className='kid-sticker';
-      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,dayOfYear(),0)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(p.id,dayOfYear(),0)?'✅ Done':'Mark complete';
+      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded kid-btn '+(isDone(p.id,dayOfYear(),0)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(p.id,dayOfYear(),0)?'✅ Done':'Mark complete';
       btn.onclick=()=> toggle(p.id, dayOfYear(), 0, {side:st.side});
       row.appendChild(img); row.appendChild(left); row.appendChild(btn);
       card.appendChild(row); cards.appendChild(card);
@@ -400,56 +416,6 @@ function render(){
   }
 }
 render();
-</script>
-<script>
-(function(){
-  if (!('speechSynthesis' in window)) return;
-
-  async function fetchPassage(url){
-    try {
-      const resp = await fetch(url);
-      const html = await resp.text();
-      // BibleGateway wraps passage text in <div class="passage-text">
-      const div = document.createElement('div');
-      div.innerHTML = html;
-      const textNodes = div.querySelectorAll('.passage-text');
-      return Array.from(textNodes).map(n=>n.innerText.trim()).join('\n');
-    } catch(e) {
-      return '';
-    }
-  }
-
-  function speak(text){
-    if(!text) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.0;
-    speechSynthesis.speak(u);
-  }
-
-  // Add “🔊 Listen” buttons next to kids “Read now”
-  function attachTTS(){
-    document.querySelectorAll('.card a.underline').forEach(link=>{
-      if(link.__ttsBound) return;
-      link.__ttsBound = true;
-      if(!link.href.includes('biblegateway.com')) return;
-      const btn = document.createElement('button');
-      btn.textContent = '🔊 Listen';
-      btn.className = 'ml-2 text-xs underline';
-      btn.onclick = async e=>{
-        e.preventDefault();
-        btn.textContent = 'Loading...';
-        const text = await fetchPassage(link.href);
-        btn.textContent = '🔊 Listen';
-        speak(text);
-      };
-      link.insertAdjacentElement('afterend', btn);
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', ()=>setTimeout(attachTTS,500));
-  setInterval(attachTTS, 2000); // catch re-renders
-})();
 </script>
 </body>
 </html>
