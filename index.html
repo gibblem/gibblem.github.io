@@ -26,20 +26,23 @@
     }
     body{ background: var(--bg); color: var(--text); }
     .card { background: var(--card); border:1px solid var(--border); }
-    .kid-card { background: linear-gradient(180deg,var(--kid-start),var(--kid-end)); border:1px solid var(--border); }
+    .kid-card { border:1px solid var(--border); }
     .adult-card { background: linear-gradient(180deg,var(--adult-start),var(--adult-end)); border:1px solid var(--border); }
     .completed { border-color:#10b981!important; box-shadow:0 0 0 2px #10b98133 inset; }
-    .kid-sticker { width: 72px; height: 72px; border-radius: 16px; object-fit: cover; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+    .kid-sticker { width: 84px; height: 84px; border-radius: 18px; object-fit: cover; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
     .confetti { position: fixed; left: 0; top: 0; pointer-events: none; width: 100%; height: 100%; overflow: hidden; }
     .piece { position: absolute; font-size: 22px; animation: fall 1200ms ease-in forwards; opacity: .9; }
     @keyframes fall { to { transform: translate(var(--dx), var(--dy)) rotate(540deg); opacity: 0; } }
     .muted{ color: var(--muted); }
     .bordered{ border:1px solid var(--border); }
     .theme-toggle{ border:1px solid var(--border); }
+    /* Modal */
+    .modal{ position: fixed; inset:0; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,.5); z-index:50; }
+    .modal.show{ display:flex; }
   </style>
 </head>
 <body>
-  <div class="max-w-3xl mx-auto px-4 py-6">
+  <div class="max-w-5xl mx-auto px-4 py-6">
     <header class="flex items-center justify-between mb-4">
       <div>
         <h1 class="text-2xl font-bold">Family Bible Reading</h1>
@@ -68,12 +71,12 @@
       </div>
     </div>
 
-    <div id="cards" class="grid gap-3"></div>
+    <div id="cards" class="grid md:grid-cols-2 gap-3"></div>
 
     <div class="mt-6 p-4 rounded-2xl card">
       <div class="text-sm muted">Peek ahead</div>
       <div class="text-lg font-semibold" id="peekTitle">Tomorrow</div>
-      <div id="peek" class="grid gap-3 mt-3"></div>
+      <div id="peek" class="grid md:grid-cols-2 gap-3 mt-3"></div>
     </div>
 
     <footer class="text-center text-xs muted mt-6">
@@ -82,6 +85,18 @@
   </div>
 
   <div id="confetti" class="confetti" aria-hidden="true"></div>
+
+  <!-- Story Modal -->
+  <div id="storyModal" class="modal">
+    <div class="card rounded-2xl p-4 max-w-md w-[92%]">
+      <div class="flex justify-between items-center mb-2">
+        <h3 id="modalTitle" class="text-xl font-semibold">Story</h3>
+        <button id="modalClose" class="px-3 py-1 bordered rounded bg-transparent">Close</button>
+      </div>
+      <img id="modalImg" src="" alt="" class="w-full h-48 object-cover rounded-xl mb-3"/>
+      <p id="modalText" class="text-sm leading-relaxed"></p>
+    </div>
+  </div>
 
 <script>
 // ---- Theme handling ----
@@ -119,73 +134,49 @@ const refToUrl=(book,st,en,ver)=>{ const r=(en&&en!==st)?`${book} ${st}-${en}`:`
 const dayOfYear=(d=new Date())=> Math.floor((d - new Date(d.getFullYear(),0,1))/86400000);
 function dailyDistribution(total,days=365){ const out=[]; for(let d=0; d<days; d++){ const t=Math.round(((d+1)*total)/days); const p=Math.round((d*total)/days); out.push(t-p);} return out; }
 
-// Build ranges with wrap support for a segment [startIdx, endIdx)
 function buildRangesLoop(counts, startIdx, endIdx){
-  const out=[];
-  let idx=startIdx;
-  const len = endIdx - startIdx;
+  const out=[]; let idx=startIdx; const len=endIdx-startIdx;
   for(const n of counts){
-    // guard
-    if(len<=0){ out.push({startBook:'Matthew',startCh:1,endBook:'Matthew',endCh:1}); continue; }
-    let start = flatten[idx];
-    if(!start){ // if somehow outside, normalize
-      const norm = startIdx + ((idx - startIdx) % len + len) % len;
-      start = flatten[norm];
-      idx = norm;
-    }
-    let left = n;
-    let last = start;
-    while(left>0){
-      last = flatten[idx];
-      idx++;
-      // wrap within NT segment if needed
-      if(idx >= endIdx) idx = startIdx;
-      left--;
-    }
-    out.push({startBook:start.book,startCh:start.chapter,endBook:last.chapter? last.book : start.book, endCh:last.chapter || start.chapter});
+    let start=flatten[idx];
+    let left=n; let last=start;
+    for(let k=0;k<n;k++){ last=flatten[idx]; idx++; if(idx>=endIdx) idx=startIdx; }
+    out.push({startBook:start.book,startCh:start.chapter,endBook:last.book,endCh:last.chapter});
   }
   return out;
 }
-
 function buildRanges(counts,startIdx){
-  // Simple forward (no wrap). Used for OT.
   const out=[]; let idx=startIdx;
   for(const n of counts){
-    let start=flatten[idx]; if(!start){ start = flatten[flatten.length-1]; }
-    let left=n; let last=start;
+    let start=flatten[idx]; let left=n; let last=start;
     while(left>0 && idx<flatten.length){ last=flatten[idx]; idx++; left--; }
     out.push({startBook:start.book,startCh:start.chapter,endBook:last.book,endCh:last.chapter});
   }
   return out;
 }
 
-// Reliable NT/OT indices
-const NT_START = Number.isInteger(bookStartIndex['Matthew']) ? bookStartIndex['Matthew'] : flatten.findIndex(x=>x.book==='Matthew' && x.chapter===1);
-const NT_END = flatten.length; // end of Bible array
-const OT_END = NT_START; // end of OT segment
-const OT_CHAPTERS = OT_END; // 929
-const NT_CHAPTERS = NT_END - NT_START; // 260
+const NT_START = bookStartIndex['Matthew'];
+const NT_END = flatten.length;
+const OT_END = NT_START;
+const OT_CHAPTERS = OT_END;
+const NT_CHAPTERS = NT_END - NT_START;
 
-// Distributions
-const otPerDay = dailyDistribution(OT_CHAPTERS,365);     // OT once
-const ntPerDay = dailyDistribution(NT_CHAPTERS*2,365);   // NT twice
-
-// Ranges
+const otPerDay = dailyDistribution(OT_CHAPTERS,365);
+const ntPerDay = dailyDistribution(NT_CHAPTERS*2,365);
 const OT_RANGES = buildRanges(otPerDay, 0);
-const NT_RANGES = buildRangesLoop(ntPerDay, NT_START, NT_END); // <-- wrap inside NT segment
+const NT_RANGES = buildRangesLoop(ntPerDay, NT_START, NT_END);
 
+function psPrForDay(d){ if(d%2===0){ const ps=Math.floor(d/2)%150+1; return {book:'Psalms',start:ps,end:ps}; } const pr=Math.floor(d/2)%31+1; return {book:'Proverbs',start:pr,end:pr}; }
 function adultDay(d){ const ot=OT_RANGES[d], nt=NT_RANGES[d], pp=psPrForDay(d);
   return [{label:'Old Testament', book:ot.startBook, start:ot.startCh, end:ot.endCh, version:'ESV'},
           {label:'New Testament', book:nt.startBook, start:nt.startCh, end:nt.endCh, version:'ESV'},
           {label: pp.book==='Psalms'?'Psalm':'Proverb', book:pp.book, start:pp.start, end:pp.end, version:'ESV'}]; }
-function psPrForDay(d){ if(d%2===0){ const ps=Math.floor(d/2)%150+1; return {book:'Psalms',start:ps,end:ps}; } const pr=Math.floor(d/2)%31+1; return {book:'Proverbs',start:pr,end:pr}; }
 function kidsDay(d){ const main = d%2===0? {book:OT_RANGES[d].startBook, start:OT_RANGES[d].startCh, end:OT_RANGES[d].startCh}
                                           : {book:NT_RANGES[d].startBook, start:NT_RANGES[d].startCh, end:NT_RANGES[d].startCh};
   const pp=psPrForDay(d);
   return [{label:'Main Story', book:main.book, start:main.start, end:main.end, version:'NIrV'},
           {label: pp.book==='Psalms'?'Psalm':'Proverb', book:pp.book, start:pp.start, end:pp.end, version:'NIrV'}]; }
 
-const KEY='family-bible-reading-ntfix';
+const KEY='family-bible-reading-overview';
 function load(){ try{return JSON.parse(localStorage.getItem(KEY))||{};}catch{return{};} }
 function save(x){ localStorage.setItem(KEY, JSON.stringify(x)); }
 const defaultProfiles=[{id:'dad',name:'Dad',type:'adult'},{id:'mom',name:'Mom',type:'adult'},{id:'elle',name:'Elle',type:'kid'},{id:'lainey',name:'Lainey',type:'kid'}];
@@ -203,7 +194,35 @@ function markAll(pid, day, len){ S.completed[pid+':'+day]=Array.from({length:len
 function percent(pid, type){ let done=0; for(let d=0; d<=S.today; d++){ const key=pid+':'+d; const need=(type==='adult'?3:2); if((S.completed[key]||[]).length>=need) done++; } return Math.round((done/(S.today+1))*100); }
 function current(profile, day){ return profile.type==='adult' ? adultDay(day) : kidsDay(day); }
 function fmt(r){ return r.start===r.end? `${r.book} ${r.start}`:`${r.book} ${r.start}-${r.end}`; }
-function imgFor(i){ const n=(i%6)+1; return `images/kid-${n}.png`; }
+
+// Kids sticker set + themes
+const STORIES=[
+  {title:"Noah’s Ark", img:"images/kid-1.png", colors:["#dff2ff","#bfe7ff"]},
+  {title:"David & Goliath", img:"images/kid-2.png", colors:["#fff3c8","#e6f5e9"]},
+  {title:"Jesus and Children", img:"images/kid-3.png", colors:["#eee7fb","#fbf8ef"]},
+  {title:"Rainbow & Dove", img:"images/kid-4.png", colors:["#e4f6fb","#ffecee"]},
+  {title:"Jonah & the Whale", img:"images/kid-5.png", colors:["#e0f3ff","#d0f0f8"]},
+  {title:"Nativity", img:"images/kid-6.png", colors:["#0f1b2a","#2a1f0f"]}
+];
+const SUMMARIES={
+  "Noah’s Ark":"God told Noah to build a big boat. Noah trusted God. When the rain came, God kept Noah, his family, and the animals safe. God set a rainbow as a promise of His love.",
+  "David & Goliath":"A giant scared everyone, but David trusted God. With a simple sling and a smooth stone, God helped David win. God is bigger than our fears.",
+  "Jesus and Children":"People brought children to Jesus. He welcomed them with love and said, “Let the children come to me.” Jesus cares for kids very much.",
+  "Rainbow & Dove":"After the flood, God promised never to flood the whole earth again. The rainbow reminds us of God’s faithful promise and care.",
+  "Jonah & the Whale":"Jonah ran away, but God sent a big fish to rescue him. Jonah prayed, and God gave him another chance. God loves to forgive.",
+  "Nativity":"Jesus was born in Bethlehem. Angels sang, shepherds came, and a bright star shone. Jesus is God’s gift to the world."
+};
+
+// Deterministic "random" for a given day + slot so it stays stable across reloads
+function pickStory(day, slot){
+  const x = Math.abs(Math.sin(day*97 + slot*53)) * 10000;
+  const idx = Math.floor(x) % STORIES.length;
+  return STORIES[idx];
+}
+
+function stickerGradient(styleEl, colors){
+  styleEl.textContent = `.kid-card{background: linear-gradient(180deg, ${colors[0]}, ${colors[1]})}`;
+}
 
 // Tiny confetti burst using emoji
 function confetti(){
@@ -222,77 +241,160 @@ function confetti(){
 // Theme select
 (function(){
   const sel = document.getElementById('theme');
-  try{
-    const saved = localStorage.getItem('fbr-theme') || 'auto';
-    sel.value = saved;
-  }catch(e){ sel.value = 'auto'; }
-  sel.onchange = (e)=>{
-    const v = e.target.value || 'auto';
-    if(window._setTheme) window._setTheme(v);
-  };
+  try{ sel.value = localStorage.getItem('fbr-theme') || 'auto'; }catch(e){ sel.value='auto'; }
+  sel.onchange = (e)=>{ if(window._setTheme) window._setTheme(e.target.value||'auto'); };
 })();
 
+// Modal
+const modal = {
+  root: null, titleEl:null, imgEl:null, textEl:null, closeBtn:null,
+  init(){
+    this.root=document.getElementById('storyModal');
+    this.titleEl=document.getElementById('modalTitle');
+    this.imgEl=document.getElementById('modalImg');
+    this.textEl=document.getElementById('modalText');
+    this.closeBtn=document.getElementById('modalClose');
+    this.closeBtn.onclick=()=> this.hide();
+    this.root.addEventListener('click',(e)=>{ if(e.target===this.root) this.hide(); });
+  },
+  show(title, img, text){
+    this.titleEl.textContent=title;
+    this.imgEl.src=img;
+    this.textEl.textContent=text;
+    this.root.classList.add('show');
+  },
+  hide(){ this.root.classList.remove('show'); }
+};
+modal.init();
+
 function render(){
+  // Populate user selector
   const userSel = document.getElementById('user');
   userSel.innerHTML='';
   S.profiles.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; if(p.id===S.activeId) o.selected=true; userSel.appendChild(o); });
+  // Add Kids Overview option for adults
+  const kopt=document.createElement('option'); kopt.value='_kids_overview'; kopt.textContent='👀 View Kids’ Progress'; if(S.activeId==='_kids_overview') kopt.selected=true; userSel.appendChild(kopt);
   userSel.onchange = e=>{ S.activeId=e.target.value; save(S); render(); };
 
   document.getElementById('yesterday').onclick = ()=>{ S.today=(S.today+364)%365; render(); };
   document.getElementById('tomorrow').onclick  = ()=>{ S.today=(S.today+1)%365; render(); };
   document.getElementById('prev').onclick      = ()=>{ S.offset--; render(); };
   document.getElementById('next').onclick      = ()=>{ S.offset++; render(); };
-  document.getElementById('markAll').onclick   = ()=>{ const p = S.profiles.find(x=>x.id===S.activeId)||S.profiles[0]; const r=current(p, (S.today+S.offset+365)%365); markAll(p.id, S.today, r.length); };
+  document.getElementById('markAll').onclick   = ()=>{
+    const act = (S.activeId==='_kids_overview') ? {id:'elle', type:'kid'} : (S.profiles.find(x=>x.id===S.activeId)||S.profiles[0]);
+    const r=current(act, (S.today+S.offset+365)%365); markAll(act.id, S.today, r.length);
+  };
 
-  const p = S.profiles.find(x=>x.id===S.activeId)||S.profiles[0];
-  document.getElementById('progressPct').textContent = percent(p.id, p.type)+'%';
   const idx = (S.today + S.offset + 365)%365;
-  const readings = current(p, idx);
-
   const cards = document.getElementById('cards');
-  cards.innerHTML='';
-  readings.forEach((r,i)=>{
-    const card=document.createElement('div');
-    const kid = p.type==='kid';
-    card.className='p-4 rounded-2xl '+(kid?'kid-card':'adult-card')+(isDone(p.id,S.today,i)?' completed':'');
-
-    const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between';
-
-    const left=document.createElement('div'); left.className='flex-1';
-    const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide muted'; tag.textContent=r.label;
-    const title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=fmt(r);
-    const a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
-    left.appendChild(tag); left.appendChild(title); left.appendChild(a);
-
-    if(kid){
-      const img=document.createElement('img'); img.src=imgFor(i); img.alt='Sticker'; img.className='kid-sticker';
-      row.appendChild(img);
-    }
-
-    const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,S.today,i)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(p.id,S.today,i)?'✅ Done':'Mark complete';
-    btn.onclick=()=> toggle(p.id,S.today,i);
-
-    row.appendChild(left);
-    row.appendChild(btn);
-    card.appendChild(row);
-    cards.appendChild(card);
-  });
-
-  document.getElementById('peekTitle').textContent = p.type==='adult' ? 'Tomorrow (Adults • ESV)' : 'Tomorrow (Kids • NIrV)';
   const peek = document.getElementById('peek');
-  peek.innerHTML='';
-  const tmr = current(p, (S.today+1)%365);
-  tmr.forEach((r,i)=>{
-    const row=document.createElement('div'); row.className='p-3 rounded-xl card flex items-center justify-between gap-4';
-    const left=document.createElement('div');
-    const l1=document.createElement('div'); l1.className='text-sm uppercase tracking-wide muted'; l1.textContent=r.label;
-    const l2=document.createElement('div'); l2.className='font-medium'; l2.textContent=fmt(r);
-    const a=document.createElement('a'); a.className='text-xs underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
-    left.appendChild(l1); left.appendChild(l2); left.appendChild(a);
-    if(p.type==='kid'){ const img=document.createElement('img'); img.src=imgFor(i+1); img.alt='Sticker'; img.className='kid-sticker'; row.appendChild(img); }
-    row.appendChild(left);
-    peek.appendChild(row);
-  });
+  cards.innerHTML=''; peek.innerHTML='';
+
+  // Render based on mode
+  if(S.activeId==='_kids_overview'){
+    document.getElementById('progressPct').textContent = Math.round((percent('elle','kid')+percent('lainey','kid'))/2) + '%';
+
+    ['elle','lainey'].forEach((kidId, colIdx)=>{
+      const p = S.profiles.find(x=>x.id===kidId);
+      const readings = current(p, idx);
+      readings.forEach((r,i)=>{
+        const story=pickStory(idx, i+colIdx*7);
+        const styleEl=document.createElement('style'); stickerGradient(styleEl, story.colors); document.head.appendChild(styleEl);
+        const card=document.createElement('div'); card.className='p-4 rounded-2xl kid-card '+(isDone(p.id,S.today,i)?' completed':'');
+        const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between';
+        const left=document.createElement('div'); left.className='flex-1';
+        const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide muted'; tag.textContent=p.name+' • '+r.label;
+        const title=document.createElement('div'); title.className='text-xl font-semibold cursor-pointer'; title.textContent=story.title+' — '+(r.start===r.end? r.book+' '+r.start : r.book+' '+r.start+'-'+r.end);
+        title.onclick=()=> modal.show(story.title, story.img, SUMMARIES[story.title]);
+        const a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
+        left.appendChild(tag); left.appendChild(title); left.appendChild(a);
+
+        const img=document.createElement('img'); img.src=story.img; img.alt=story.title; img.className='kid-sticker cursor-pointer';
+        img.onclick=()=> modal.show(story.title, story.img, SUMMARIES[story.title]);
+
+        const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,S.today,i)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(p.id,S.today,i)?'✅ Done':'Mark complete';
+        btn.onclick=()=> toggle(p.id,S.today,i);
+
+        row.appendChild(img); row.appendChild(left); row.appendChild(btn);
+        card.appendChild(row);
+        cards.appendChild(card);
+      });
+
+      // Peek tomorrow per kid
+      const tmr = current(p, (S.today+1)%365);
+      tmr.forEach((r,i)=>{
+        const story=pickStory((S.today+1)%365, i+colIdx*7);
+        const row=document.createElement('div'); row.className='p-3 rounded-xl card flex items-center justify-between gap-4';
+        const left=document.createElement('div');
+        const l1=document.createElement('div'); l1.className='text-sm uppercase tracking-wide muted'; l1.textContent=p.name+' • '+r.label;
+        const l2=document.createElement('div'); l2.className='font-medium cursor-pointer'; l2.textContent=story.title+' — '+(r.start===r.end? r.book+' '+r.start : r.book+' '+r.start+'-'+r.end);
+        l2.onclick=()=> modal.show(story.title, story.img, SUMMARIES[story.title]);
+        const a=document.createElement('a'); a.className='text-xs underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
+        left.appendChild(l1); left.appendChild(l2); left.appendChild(a);
+        const img=document.createElement('img'); img.src=story.img; img.alt=story.title; img.className='kid-sticker cursor-pointer';
+        img.onclick=()=> modal.show(story.title, story.img, SUMMARIES[story.title]);
+        row.appendChild(img); row.appendChild(left);
+        peek.appendChild(row);
+      });
+    });
+
+  } else {
+    // Normal per-user mode
+    const p = S.profiles.find(x=>x.id===S.activeId)||S.profiles[0];
+    document.getElementById('progressPct').textContent = percent(p.id, p.type)+'%';
+    const readings = current(p, idx);
+
+    readings.forEach((r,i)=>{
+      const isKid=p.type==='kid';
+      const card=document.createElement('div'); card.className='p-4 rounded-2xl '+(isKid?'kid-card':'adult-card')+(isDone(p.id,S.today,i)?' completed':'');
+      const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between';
+      const left=document.createElement('div'); left.className='flex-1';
+      const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide muted'; tag.textContent=r.label;
+      const title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=(r.start===r.end? r.book+' '+r.start : r.book+' '+r.start+'-'+r.end);
+      const a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
+      left.appendChild(tag); left.appendChild(title); left.appendChild(a);
+
+      if(isKid){
+        const story=pickStory(idx, i);
+        const styleEl=document.createElement('style'); stickerGradient(styleEl, story.colors); document.head.appendChild(styleEl);
+        const img=document.createElement('img'); img.src=story.img; img.alt=story.title; img.className='kid-sticker cursor-pointer';
+        const titleWrap=document.createElement('div'); titleWrap.className='text-sm font-medium cursor-pointer'; titleWrap.textContent=story.title;
+        img.onclick=()=> modal.show(story.title, story.img, SUMMARIES[story.title]);
+        titleWrap.onclick=()=> modal.show(story.title, story.img, SUMMARIES[story.title]);
+        left.appendChild(titleWrap);
+        row.appendChild(img);
+      }
+
+      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,S.today,i)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(p.id,S.today,i)?'✅ Done':'Mark complete';
+      btn.onclick=()=> toggle(p.id,S.today,i);
+
+      row.appendChild(left); row.appendChild(btn);
+      card.appendChild(row);
+      cards.appendChild(card);
+    });
+
+    // Peek tomorrow
+    const tmr = current(p, (S.today+1)%365);
+    tmr.forEach((r,i)=>{
+      const row=document.createElement('div'); row.className='p-3 rounded-xl card flex items-center justify-between gap-4';
+      const left=document.createElement('div');
+      const l1=document.createElement('div'); l1.className='text-sm uppercase tracking-wide muted'; l1.textContent=r.label;
+      const l2=document.createElement('div'); l2.className='font-medium'; l2.textContent=(r.start===r.end? r.book+' '+r.start : r.book+' '+r.start+'-'+r.end);
+      const a=document.createElement('a'); a.className='text-xs underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
+      left.appendChild(l1); left.appendChild(l2); left.appendChild(a);
+      if(p.type==='kid'){
+        const story=pickStory((S.today+1)%365, i);
+        const img=document.createElement('img'); img.src=story.img; img.alt=story.title; img.className='kid-sticker cursor-pointer';
+        img.onclick=()=> modal.show(story.title, story.img, SUMMARIES[story.title]);
+        row.appendChild(img);
+        const ttitle=document.createElement('div'); ttitle.className='text-xs font-medium cursor-pointer'; ttitle.textContent=story.title;
+        ttitle.onclick=()=> modal.show(story.title, story.img, SUMMARIES[story.title]);
+        left.appendChild(ttitle);
+      }
+      row.appendChild(left);
+      peek.appendChild(row);
+    });
+  }
 }
 render();
 </script>
