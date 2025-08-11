@@ -1,20 +1,12 @@
 {
   "name": "Family Bible Reading",
-  "short_name": "BibleReading",
+  "short_name": "Bible",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
-  "description": "Daily Bible reading tracker for the family",
+  "theme_color": "#0ea5e9",
   "icons": [
-    {
-      "src": "icons/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icons/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    {"src":"icons/icon-192x192.png","sizes":"192x192","type":"image/png"},
+    {"src":"icons/icon-512x512.png","sizes":"512x512","type":"image/png"}
   ]
 }
