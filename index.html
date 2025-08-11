@@ -401,55 +401,5 @@ function render(){
 }
 render();
 </script>
-<script>
-(function(){
-  if (!('speechSynthesis' in window)) return;
-
-  async function fetchPassage(url){
-    try {
-      const resp = await fetch(url);
-      const html = await resp.text();
-      // BibleGateway wraps passage text in <div class="passage-text">
-      const div = document.createElement('div');
-      div.innerHTML = html;
-      const textNodes = div.querySelectorAll('.passage-text');
-      return Array.from(textNodes).map(n=>n.innerText.trim()).join('\n');
-    } catch(e) {
-      return '';
-    }
-  }
-
-  function speak(text){
-    if(!text) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.0;
-    speechSynthesis.speak(u);
-  }
-
-  // Add “🔊 Listen” buttons next to kids “Read now”
-  function attachTTS(){
-    document.querySelectorAll('.card a.underline').forEach(link=>{
-      if(link.__ttsBound) return;
-      link.__ttsBound = true;
-      if(!link.href.includes('biblegateway.com')) return;
-      const btn = document.createElement('button');
-      btn.textContent = '🔊 Listen';
-      btn.className = 'ml-2 text-xs underline';
-      btn.onclick = async e=>{
-        e.preventDefault();
-        btn.textContent = 'Loading...';
-        const text = await fetchPassage(link.href);
-        btn.textContent = '🔊 Listen';
-        speak(text);
-      };
-      link.insertAdjacentElement('afterend', btn);
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', ()=>setTimeout(attachTTS,500));
-  setInterval(attachTTS, 2000); // catch re-renders
-})();
-</script>
 </body>
 </html>
