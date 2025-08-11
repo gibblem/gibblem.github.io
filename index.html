@@ -15,13 +15,12 @@
     .kid-card { background: linear-gradient(180deg,#fffbe6,#ffe7f0); }
     .adult-card { background: linear-gradient(180deg,#f0f9ff,#e0f2fe); }
     .completed { border-color:#10b981!important; box-shadow:0 0 0 2px #10b98133 inset; }
-    #err { display:none; }
-    #err.show { display:block; }
+    #diag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; }
   </style>
 </head>
 <body class="bg-gray-50">
   <div class="max-w-3xl mx-auto px-4 py-6">
-    <div id="err" class="mb-4 p-3 rounded border border-red-300 bg-red-50 text-red-800 text-sm"></div>
+    <div id="err" class="hidden mb-4 p-3 rounded border border-red-300 bg-red-50 text-red-800 text-sm"></div>
 
     <header class="flex items-center justify-between mb-4">
       <div>
@@ -53,149 +52,169 @@
       <div id="peek" class="grid gap-3 mt-3"></div>
     </div>
 
+    <details class="mt-6">
+      <summary class="text-sm text-gray-500 cursor-pointer">Diagnostics</summary>
+      <div id="diag" class="mt-2 p-2 rounded border bg-gray-50"></div>
+    </details>
+
     <footer class="text-center text-xs text-gray-500 mt-6">
-      Add to iOS Home Screen: Share → “Add to Home Screen” (works online; offline caching disabled for now).
+      Add to iOS Home Screen: Share → “Add to Home Screen” (online use; offline caching disabled).
     </footer>
   </div>
 
 <script>
 (function(){
-  function showErr(msg){
-    try{
-      var el=document.getElementById('err'); if(!el) return;
-      el.textContent = msg; el.className='mb-4 p-3 rounded border border-red-300 bg-red-50 text-red-800 text-sm show';
-      console.error(msg);
-    }catch(e){}
+  function err(msg){
+    const el=document.getElementById('err'); el.textContent=msg; el.classList.remove('hidden');
+    console.error(msg);
   }
-  try{
-    // ---- Data and helpers (vanilla JS) ----
-    var BOOKS=[
-      {n:'Genesis',c:50},{n:'Exodus',c:40},{n:'Leviticus',c:27},{n:'Numbers',c:36},{n:'Deuteronomy',c:34},
-      {n:'Joshua',c:24},{n:'Judges',c:21},{n:'Ruth',c:4},{n:'1 Samuel',c:31},{n:'2 Samuel',c:24},
-      {n:'1 Kings',c:22},{n:'2 Kings',c:25},{n:'1 Chronicles',c:29},{n:'2 Chronicles',c:36},{n:'Ezra',c:10},
-      {n:'Nehemiah',c:13},{n:'Esther',c:10},{n:'Job',c:42},{n:'Psalms',c:150},{n:'Proverbs',c:31},
-      {n:'Ecclesiastes',c:12},{n:'Song of Solomon',c:8},{n:'Isaiah',c:66},{n:'Jeremiah',c:52},{n:'Lamentations',c:5},
-      {n:'Ezekiel',c:48},{n:'Daniel',c:12},{n:'Hosea',c:14},{n:'Joel',c:3},{n:'Amos',c:9},
-      {n:'Obadiah',c:1},{n:'Jonah',c:4},{n:'Micah',c:7},{n:'Nahum',c:3},{n:'Habakkuk',c:3},
-      {n:'Zephaniah',c:3},{n:'Haggai',c:2},{n:'Zechariah',c:14},{n:'Malachi',c:4},
-      {n:'Matthew',c:28},{n:'Mark',c:16},{n:'Luke',c:24},{n:'John',c:21},{n:'Acts',c:28},
-      {n:'Romans',c:16},{n:'1 Corinthians',c:16},{n:'2 Corinthians',c:13},{n:'Galatians',c:6},{n:'Ephesians',c:6},
-      {n:'Philippians',c:4},{n:'Colossians',c:4},{n:'1 Thessalonians',c:5},{n:'2 Thessalonians',c:3},
-      {n:'1 Timothy',c:6},{n:'2 Timothy',c:4},{n:'Titus',c:3},{n:'Philemon',c:1},{n:'Hebrews',c:13},
-      {n:'James',c:5},{n:'1 Peter',c:5},{n:'2 Peter',c:3},{n:'1 John',c:5},{n:'2 John',c:1},{n:'3 John',c:1},
-      {n:'Jude',c:1},{n:'Revelation',c:22}
+  function setDiag(obj){
+    const el=document.getElementById('diag');
+    if(el) el.textContent = JSON.stringify(obj, null, 2);
+  }
+
+  // Bible structure and helpers
+  const BOOKS=[
+    {n:'Genesis',c:50},{n:'Exodus',c:40},{n:'Leviticus',c:27},{n:'Numbers',c:36},{n:'Deuteronomy',c:34},
+    {n:'Joshua',c:24},{n:'Judges',c:21},{n:'Ruth',c:4},{n:'1 Samuel',c:31},{n:'2 Samuel',c:24},
+    {n:'1 Kings',c:22},{n:'2 Kings',c:25},{n:'1 Chronicles',c:29},{n:'2 Chronicles',c:36},{n:'Ezra',c:10},
+    {n:'Nehemiah',c:13},{n:'Esther',c:10},{n:'Job',c:42},{n:'Psalms',c:150},{n:'Proverbs',c:31},
+    {n:'Ecclesiastes',c:12},{n:'Song of Solomon',c:8},{n:'Isaiah',c:66},{n:'Jeremiah',c:52},{n:'Lamentations',c:5},
+    {n:'Ezekiel',c:48},{n:'Daniel',c:12},{n:'Hosea',c:14},{n:'Joel',c:3},{n:'Amos',c:9},
+    {n:'Obadiah',c:1},{n:'Jonah',c:4},{n:'Micah',c:7},{n:'Nahum',c:3},{n:'Habakkuk',c:3},
+    {n:'Zephaniah',c:3},{n:'Haggai',c:2},{n:'Zechariah',c:14},{n:'Malachi',c:4},
+    {n:'Matthew',c:28},{n:'Mark',c:16},{n:'Luke',c:24},{n:'John',c:21},{n:'Acts',c:28},
+    {n:'Romans',c:16},{n:'1 Corinthians',c:16},{n:'2 Corinthians',c:13},{n:'Galatians',c:6},{n:'Ephesians',c:6},
+    {n:'Philippians',c:4},{n:'Colossians',c:4},{n:'1 Thessalonians',c:5},{n:'2 Thessalonians',c:3},
+    {n:'1 Timothy',c:6},{n:'2 Timothy',c:4},{n:'Titus',c:3},{n:'Philemon',c:1},{n:'Hebrews',c:13},
+    {n:'James',c:5},{n:'1 Peter',c:5},{n:'2 Peter',c:3},{n:'1 John',c:5},{n:'2 John',c:1},{n:'3 John',c:1},
+    {n:'Jude',c:1},{n:'Revelation',c:22}
+  ];
+  const flatten=[]; const bookStartIndex={};
+  BOOKS.forEach(b=>{ bookStartIndex[b.n] = flatten.length; for(let i=1;i<=b.c;i++) flatten.push({book:b.n,chapter:i}); });
+  const refToUrl=(book,st,en,ver)=>{
+    const r=(en && en!==st)?`${book} ${st}-${en}`:`${book} ${st}`;
+    return `https://www.biblegateway.com/passage/?search=${encodeURIComponent(r)}&version=${encodeURIComponent(ver)}`;
+  };
+  const dayOfYear=(d=new Date())=> Math.floor((d - new Date(d.getFullYear(),0,1))/86400000);
+  function dailyDistribution(total,days=365){ const out=[]; for(let d=0; d<days; d++){ const t=Math.round(((d+1)*total)/days); const p=Math.round((d*total)/days); out.push(t-p);} return out; }
+  function buildRanges(counts,startIdx){
+    const out=[]; let idx=startIdx;
+    for(const n of counts){
+      let start=flatten[idx]; if(!start){ out.push({startBook:'Genesis',startCh:1,endBook:'Genesis',endCh:1}); continue; }
+      let left=n; let last=start;
+      while(left>0 && idx<flatten.length){ last=flatten[idx]; idx++; left--; }
+      out.push({startBook:start.book,startCh:start.chapter,endBook:last.book,endCh:last.chapter});
+    }
+    return out;
+  }
+  function psPrForDay(d){ if(d%2===0){ const ps=Math.floor(d/2)%150+1; return {book:'Psalms',start:ps,end:ps}; } const pr=Math.floor(d/2)%31+1; return {book:'Proverbs',start:pr,end:pr}; }
+
+  // Reliable starts
+  const OT_CHAPTERS = bookStartIndex['Matthew']; // 929
+  const NT_START = bookStartIndex['Matthew'];    // start index into NT
+  const NT_CHAPTERS = flatten.length - NT_START; // 260
+
+  const otPerDay = dailyDistribution(OT_CHAPTERS,365);
+  const ntPerDay = dailyDistribution(NT_CHAPTERS*2,365);
+  const OT_RANGES = buildRanges(otPerDay, 0);
+  const NT_RANGES = buildRanges(ntPerDay, NT_START);
+
+  function adultDay(d){
+    const ot=OT_RANGES[d], nt=NT_RANGES[d], pp=psPrForDay(d);
+    return [
+      {label:'Old Testament', book:ot.startBook, start:ot.startCh, end:ot.endCh, version:'ESV'},
+      {label:'New Testament', book:nt.startBook, start:nt.startCh, end:nt.endCh, version:'ESV'},
+      {label: pp.book==='Psalms'?'Psalm':'Proverb', book:pp.book, start:pp.start, end:pp.end, version:'ESV'}
     ];
-    var flatten=[]; BOOKS.forEach(function(b){ for(var i=1;i<=b.c;i++) flatten.push({book:b.n,chapter:i}); });
-    function findStart(name){ for(var i=0;i<flatten.length;i++){ if(flatten[i].book===name && flatten[i].chapter===1) return i; } return -1; }
-    function refToUrl(book,st,en,ver){ var r=(en && en!==st)? (book+' '+st+'-'+en):(book+' '+st); return 'https://www.biblegateway.com/passage/?search='+encodeURIComponent(r)+'&version='+encodeURIComponent(ver); }
-    function dayOfYear(d){ d=d||new Date(); return Math.floor((d - new Date(d.getFullYear(),0,1))/86400000); }
-    function dailyDistribution(total,days){ days=days||365; var out=[]; for(var d=0; d<days; d++){ var t=Math.round(((d+1)*total)/days); var p=Math.round((d*total)/days); out.push(t-p);} return out; }
-    function buildRanges(counts,startIdx){
-      var out=[]; var idx=startIdx;
-      for(var k=0;k<counts.length;k++){
-        var n=counts[k]; var start=flatten[idx]; if(!start){ out.push({startBook:'Genesis',startCh:1,endBook:'Genesis',endCh:1}); continue; }
-        var left=n; var last=start;
-        while(left>0 && idx<flatten.length){ last=flatten[idx]; idx++; left--; }
-        out.push({startBook:start.book,startCh:start.chapter,endBook:last.book,endCh:last.chapter});
-      }
-      return out;
-    }
-    function psPrForDay(d){ if(d%2===0){ var ps=Math.floor(d/2)%150+1; return {book:'Psalms',start:ps,end:ps}; } var pr=Math.floor(d/2)%31+1; return {book:'Proverbs',start:pr,end:pr}; }
-    var OT_CHAPTERS = findStart('Matthew'); if(OT_CHAPTERS<0) OT_CHAPTERS=929;
-    var NT_CHAPTERS = flatten.length - OT_CHAPTERS;
-    var otPerDay = dailyDistribution(OT_CHAPTERS,365);
-    var ntPerDay = dailyDistribution(NT_CHAPTERS*2,365);
-    var OT_RANGES = buildRanges(otPerDay,0);
-    var NT_RANGES = buildRanges(ntPerDay,findStart('Matthew'));
-
-    function adultDay(d){ var ot=OT_RANGES[d], nt=NT_RANGES[d], pp=psPrForDay(d);
-      return [{label:'Old Testament', book:ot.startBook, start:ot.startCh, end:ot.endCh, version:'ESV'},
-              {label:'New Testament', book:nt.startBook, start:nt.startCh, end:nt.endCh, version:'ESV'},
-              {label:(pp.book==='Psalms'?'Psalm':'Proverb'), book:pp.book, start:pp.start, end:pp.end, version:'ESV'}]; }
-    function kidsDay(d){ var main = (d%2===0)? {book:OT_RANGES[d].startBook, start:OT_RANGES[d].startCh, end:OT_RANGES[d].startCh}
-                                              : {book:NT_RANGES[d].startBook, start:NT_RANGES[d].startCh, end:NT_RANGES[d].startCh};
-      var pp=psPrForDay(d);
-      return [{label:'Main Story', book:main.book, start:main.start, end:main.end, version:'NIrV'},
-              {label:(pp.book==='Psalms'?'Psalm':'Proverb'), book:pp.book, start:pp.start, end:pp.end, version:'NIrV'}]; }
-    var KEY='family-bible-reading-robust';
-    function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; } catch(e){ showErr('Storage error: '+e.message); return {}; } }
-    function save(x){ try{ localStorage.setItem(KEY, JSON.stringify(x)); } catch(e){ showErr('Storage save error: '+e.message); } }
-    var defaultProfiles=[{id:'dad',name:'Dad',type:'adult'},{id:'mom',name:'Mom',type:'adult'},{id:'elle',name:'Elle',type:'kid'},{id:'lainey',name:'Lainey',type:'kid'}];
-
-    var S = load();
-    if(!S.profiles) S.profiles = defaultProfiles;
-    if(!S.activeId) S.activeId = S.profiles[0].id;
-    if(typeof S.offset!=='number') S.offset=0;
-    if(!S.completed) S.completed={};
-    S.today = dayOfYear();
-
-    function isDone(pid, day, i){ var arr = S.completed[pid+':'+day]||[]; return arr.indexOf(i)!==-1; }
-    function toggle(pid, day, i){ var k=pid+':'+day; var set=new Set(S.completed[k]||[]); if(set.has(i)) set.delete(i); else set.add(i); S.completed[k]=Array.from(set); save(S); render(); }
-    function markAll(pid, day, len){ S.completed[pid+':'+day]=Array.from({length:len},function(_,i){return i;}); save(S); render(); }
-    function percent(pid, type){ var done=0; for(var d=0; d<=S.today; d++){ var key=pid+':'+d; var need=(type==='adult'?3:2); if((S.completed[key]||[]).length>=need) done++; } return Math.round((done/(S.today+1))*100); }
-    function current(profile, day){ return profile.type==='adult' ? adultDay(day) : kidsDay(day); }
-    function fmt(r){ return (r.start===r.end? (r.book+' '+r.start):(r.book+' '+r.start+'-'+r.end)); }
-
-    function bind(id, handler){ var el=document.getElementById(id); if(!el){ showErr('Missing element #' + id); return function(){}; } el.onclick=handler; return handler; }
-
-    function render(){
-      var userSel = document.getElementById('user'); if(!userSel){ showErr('Missing user selector'); return; }
-      userSel.innerHTML='';
-      S.profiles.forEach(function(p){ var o=document.createElement('option'); o.value=p.id; o.textContent=p.name; if(p.id===S.activeId) o.selected=true; userSel.appendChild(o); });
-      userSel.onchange = function(e){ S.activeId=e.target.value; save(S); render(); };
-
-      bind('yesterday', function(){ S.today=(S.today+364)%365; render(); });
-      bind('tomorrow',  function(){ S.today=(S.today+1)%365; render(); });
-      bind('prev',      function(){ S.offset--; render(); });
-      bind('next',      function(){ S.offset++; render(); });
-      bind('reset',     function(){ localStorage.removeItem(KEY); S={}; location.reload(); });
-
-      var p = S.profiles.find(function(x){return x.id===S.activeId;})||S.profiles[0];
-      var pctEl = document.getElementById('progressPct'); if(pctEl) pctEl.textContent = percent(p.id, p.type)+'%';
-      var idx = (S.today + S.offset + 365)%365;
-      var readings = current(p, idx);
-
-      var cards = document.getElementById('cards'); if(!cards){ showErr('Missing #cards'); return; }
-      cards.innerHTML='';
-      for(var i=0;i<readings.length;i++){
-        var r=readings[i];
-        var card=document.createElement('div');
-        var kid = p.type==='kid';
-        card.className='p-4 rounded-2xl border '+(kid?'kid-card':'adult-card')+(isDone(p.id,S.today,i)?' completed':'');
-        var row=document.createElement('div'); row.className='flex items-center justify-between';
-        var left=document.createElement('div');
-        var tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide text-gray-500'; tag.textContent=r.label;
-        var title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=fmt(r);
-        var a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
-        left.appendChild(tag); left.appendChild(title); left.appendChild(a);
-        var btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,S.today,i)?'bg-green-600 text-white':'border'); btn.textContent=isDone(p.id,S.today,i)?'✅ Done':'Mark complete';
-        (function(ii){ btn.onclick=function(){ toggle(p.id,S.today,ii); }; })(i);
-        row.appendChild(left); row.appendChild(btn);
-        card.appendChild(row);
-        cards.appendChild(card);
-      }
-
-      var peekTitle = document.getElementById('peekTitle'); if(peekTitle) peekTitle.textContent = p.type==='adult' ? 'Tomorrow (Adults • ESV)' : 'Tomorrow (Kids • NIrV)';
-      var peek = document.getElementById('peek'); if(!peek){ showErr('Missing #peek'); return; }
-      peek.innerHTML='';
-      var tmr = current(p, (S.today+1)%365);
-      for(var j=0;j<tmr.length;j++){
-        var rr=tmr[j];
-        var row2=document.createElement('div'); row2.className='p-3 rounded-xl border bg-gray-50';
-        var l1=document.createElement('div'); l1.className='text-sm uppercase tracking-wide text-gray-500'; l1.textContent=rr.label;
-        var l2=document.createElement('div'); l2.className='font-medium'; l2.textContent=fmt(rr);
-        var a2=document.createElement('a'); a2.className='text-xs underline'; a2.href=refToUrl(rr.book,rr.start,rr.end,rr.version); a2.target='_blank'; a2.rel='noreferrer'; a2.textContent='Read now ('+rr.version+')';
-        row2.appendChild(l1); row2.appendChild(l2); row2.appendChild(a2);
-        peek.appendChild(row2);
-      }
-
-      var markAllBtn = document.getElementById('markAll'); if(markAllBtn) markAllBtn.onclick = function(){ markAll(p.id, S.today, readings.length); };
-    }
-
-    if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', render); } else { render(); }
-  }catch(e){
-    showErr('Fatal error: '+ (e && e.message ? e.message : e));
   }
+  function kidsDay(d){
+    const main = d%2===0
+      ? {book:OT_RANGES[d].startBook, start:OT_RANGES[d].startCh, end:OT_RANGES[d].startCh}
+      : {book:NT_RANGES[d].startBook, start:NT_RANGES[d].startCh, end:NT_RANGES[d].startCh};
+    const pp=psPrForDay(d);
+    return [
+      {label:'Main Story', book:main.book, start:main.start, end:main.end, version:'NIrV'},
+      {label: pp.book==='Psalms'?'Psalm':'Proverb', book:pp.book, start:pp.start, end:pp.end, version:'NIrV'}
+    ];
+  }
+
+  // Storage (guarantee defaults)
+  const KEY='family-bible-reading-fix2';
+  function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; } catch(e){ err('Storage error: '+e.message); return {}; } }
+  function save(x){ try{ localStorage.setItem(KEY, JSON.stringify(x)); } catch(e){ err('Save error: '+e.message); } }
+  const defaultProfiles=[{id:'dad',name:'Dad',type:'adult'},{id:'mom',name:'Mom',type:'adult'},{id:'elle',name:'Elle',type:'kid'},{id:'lainey',name:'Lainey',type:'kid'}];
+
+  // Merge defaults in all cases
+  const S = Object.assign({profiles: defaultProfiles, activeId:'dad', offset:0, completed:{}}, load());
+  if(!Array.isArray(S.profiles) || S.profiles.length===0) S.profiles = defaultProfiles.slice();
+  if(!S.activeId || !S.profiles.some(p=>p.id===S.activeId)) S.activeId = S.profiles[0].id;
+  if(typeof S.offset !== 'number' || isNaN(S.offset)) S.offset = 0;
+  if(!S.completed || typeof S.completed!=='object') S.completed = {};
+  S.today = dayOfYear();
+
+  function isDone(pid, day, i){ const arr = S.completed[pid+':'+day]||[]; return arr.indexOf(i)!==-1; }
+  function toggle(pid, day, i){ const k=pid+':'+day; const set=new Set(S.completed[k]||[]); if(set.has(i)) set.delete(i); else set.add(i); S.completed[k]=Array.from(set); save(S); render(); }
+  function markAll(pid, day, len){ S.completed[pid+':'+day]=Array.from({length:len},(_,i)=>i); save(S); render(); }
+  function percent(pid, type){ let done=0; for(let d=0; d<=S.today; d++){ const key=pid+':'+d; const need=(type==='adult'?3:2); if((S.completed[key]||[]).length>=need) done++; } return Math.round((done/(S.today+1))*100); }
+  function current(profile, day){ return profile.type==='adult' ? adultDay(day) : kidsDay(day); }
+  function fmt(r){ return r.start===r.end? `${r.book} ${r.start}`:`${r.book} ${r.start}-${r.end}`; }
+
+  function bind(id, handler){ const el=document.getElementById(id); if(!el){ err('Missing element #'+id); return ()=>{}; } el.onclick=handler; return handler; }
+
+  function render(){
+    setDiag({activeId: S.activeId, profiles: S.profiles, today: S.today, offset: S.offset});
+
+    const userSel = document.getElementById('user'); if(!userSel){ err('Missing user selector'); return; }
+    userSel.innerHTML='';
+    S.profiles.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; if(p.id===S.activeId) o.selected=true; userSel.appendChild(o); });
+    userSel.onchange = e=>{ S.activeId=e.target.value; save(S); render(); };
+
+    bind('yesterday', ()=>{ S.today=(S.today+364)%365; render(); });
+    bind('tomorrow',  ()=>{ S.today=(S.today+1)%365; render(); });
+    bind('prev',      ()=>{ S.offset--; render(); });
+    bind('next',      ()=>{ S.offset++; render(); });
+    bind('reset',     ()=>{ localStorage.removeItem(KEY); location.reload(); });
+
+    const p = S.profiles.find(x=>x.id===S.activeId)||S.profiles[0];
+    document.getElementById('progressPct').textContent = percent(p.id, p.type)+'%';
+    const idx = (S.today + S.offset + 365)%365;
+    const readings = current(p, idx);
+
+    const cards = document.getElementById('cards'); if(!cards){ err('Missing #cards'); return; }
+    cards.innerHTML='';
+    readings.forEach((r,i)=>{
+      const card=document.createElement('div');
+      const kid = p.type==='kid';
+      card.className='p-4 rounded-2xl border '+(kid?'kid-card':'adult-card')+(isDone(p.id,S.today,i)?' completed':'');
+      const row=document.createElement('div'); row.className='flex items-center justify-between';
+      const left=document.createElement('div');
+      const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide text-gray-500'; tag.textContent=r.label;
+      const title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=fmt(r);
+      const a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
+      left.appendChild(tag); left.appendChild(title); left.appendChild(a);
+      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,S.today,i)?'bg-green-600 text-white':'border'); btn.textContent=isDone(p.id,S.today,i)?'✅ Done':'Mark complete';
+      btn.onclick=()=> toggle(p.id,S.today,i);
+      row.appendChild(left); row.appendChild(btn);
+      card.appendChild(row);
+      cards.appendChild(card);
+    });
+
+    document.getElementById('peekTitle').textContent = p.type==='adult' ? 'Tomorrow (Adults • ESV)' : 'Tomorrow (Kids • NIrV)';
+    const peek = document.getElementById('peek'); if(!peek){ err('Missing #peek'); return; }
+    peek.innerHTML='';
+    const tmr = current(p, (S.today+1)%365);
+    tmr.forEach((r)=>{
+      const row=document.createElement('div'); row.className='p-3 rounded-xl border bg-gray-50';
+      const l1=document.createElement('div'); l1.className='text-sm uppercase tracking-wide text-gray-500'; l1.textContent=r.label;
+      const l2=document.createElement('div'); l2.className='font-medium'; l2.textContent=fmt(r);
+      const a=document.createElement('a'); a.className='text-xs underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
+      row.appendChild(l1); row.appendChild(l2); row.appendChild(a);
+      peek.appendChild(row);
+    });
+  }
+
+  if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', render); } else { render(); }
 })();
 </script>
 </body>
