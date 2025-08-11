@@ -36,4 +36,4 @@ export default function App() {
       <p className="mt-6 text-sm text-center text-gray-600">Add this app to your iOS home screen: Tap Share → "Add to Home Screen" for quick access.</p>
     </div>
   );
-}
+
