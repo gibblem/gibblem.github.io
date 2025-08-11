@@ -1,9 +1,165 @@
 <!doctype html>
-<html>
-  <head><meta charset="utf-8"><title>Pages Smoke Test</title></head>
-  <body>
-    <h1>✅ GitHub Pages is serving index.html</h1>
-    <p>If you can see this, hosting is working. Next step: replace this file with your real app.</p>
-    <script>console.log("Smoke test loaded at", new Date().toISOString());</script>
-  </body>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Family Bible Reading</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bible Reading">
+  <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <meta name="theme-color" content="#0ea5e9">
+  <style>
+    .kid-card { background: linear-gradient(180deg,#fffbe6,#ffe7f0); }
+    .adult-card { background: linear-gradient(180deg,#f0f9ff,#e0f2fe); }
+    .completed { border-color:#10b981!important; box-shadow:0 0 0 2px #10b98133 inset; }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div class="max-w-3xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between mb-4">
+      <div>
+        <h1 class="text-2xl font-bold">Family Bible Reading</h1>
+        <p class="text-sm text-gray-500">Adults (ESV) • Kids (NIrV) • Mixed plan • Links • Per-person progress</p>
+      </div>
+      <div class="text-right">
+        <div class="text-sm text-gray-600">Progress</div>
+        <div class="text-lg font-semibold" id="progressPct">0%</div>
+      </div>
+    </header>
+
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <label class="text-sm">User:</label>
+      <select class="border rounded p-2" id="user"></select>
+      <button class="ml-auto px-3 py-2 rounded border" id="yesterday">← Yesterday</button>
+      <button class="px-3 py-2 rounded border" id="tomorrow">Tomorrow →</button>
+      <button class="px-3 py-2 rounded border" id="prev">◀ Previous suggestion</button>
+      <button class="px-3 py-2 rounded border" id="next">Next suggestion ▶</button>
+      <button class="px-3 py-2 rounded bg-green-600 text-white" id="markAll">Mark all complete</button>
+    </div>
+
+    <div id="cards" class="grid gap-3"></div>
+
+    <div class="mt-6 p-4 rounded-2xl border bg-white">
+      <div class="text-sm text-gray-500">Peek ahead</div>
+      <div class="text-lg font-semibold" id="peekTitle">Tomorrow</div>
+      <div id="peek" class="grid gap-3 mt-3"></div>
+    </div>
+
+    <footer class="text-center text-xs text-gray-500 mt-6">
+      Add to iOS Home Screen: Share → “Add to Home Screen” (works online; offline caching disabled for now).
+    </footer>
+  </div>
+
+<script>
+// ---- Data and helpers (vanilla JS) ----
+const BOOKS=[
+  {n:'Genesis',c:50},{n:'Exodus',c:40},{n:'Leviticus',c:27},{n:'Numbers',c:36},{n:'Deuteronomy',c:34},
+  {n:'Joshua',c:24},{n:'Judges',c:21},{n:'Ruth',c:4},{n:'1 Samuel',c:31},{n:'2 Samuel',c:24},
+  {n:'1 Kings',c:22},{n:'2 Kings',c:25},{n:'1 Chronicles',c:29},{n:'2 Chronicles',c:36},{n:'Ezra',c:10},
+  {n:'Nehemiah',c:13},{n:'Esther',c:10},{n:'Job',c:42},{n:'Psalms',c:150},{n:'Proverbs',c:31},
+  {n:'Ecclesiastes',c:12},{n:'Song of Solomon',c:8},{n:'Isaiah',c:66},{n:'Jeremiah',c:52},{n:'Lamentations',c:5},
+  {n:'Ezekiel',c:48},{n:'Daniel',c:12},{n:'Hosea',c:14},{n:'Joel',c:3},{n:'Amos',c:9},
+  {n:'Obadiah',c:1},{n:'Jonah',c:4},{n:'Micah',c:7},{n:'Nahum',c:3},{n:'Habakkuk',c:3},
+  {n:'Zephaniah',c:3},{n:'Haggai',c:2},{n:'Zechariah',c:14},{n:'Malachi',c:4},
+  {n:'Matthew',c:28},{n:'Mark',c:16},{n:'Luke',c:24},{n:'John',c:21},{n:'Acts',c:28},
+  {n:'Romans',c:16},{n:'1 Corinthians',c:16},{n:'2 Corinthians',c:13},{n:'Galatians',c:6},{n:'Ephesians',c:6},
+  {n:'Philippians',c:4},{n:'Colossians',c:4},{n:'1 Thessalonians',c:5},{n:'2 Thessalonians',c:3},
+  {n:'1 Timothy',c:6},{n:'2 Timothy',c:4},{n:'Titus',c:3},{n:'Philemon',c:1},{n:'Hebrews',c:13},
+  {n:'James',c:5},{n:'1 Peter',c:5},{n:'2 Peter',c:3},{n:'1 John',c:5},{n:'2 John',c:1},{n:'3 John',c:1},
+  {n:'Jude',c:1},{n:'Revelation',c:22}
+];
+const flatten=[]; BOOKS.forEach(b=>{for(let i=1;i<=b.c;i++) flatten.push({book:b.n,chapter:i});});
+const findStart=(name)=> flatten.findIndex(x=>x.book===name && x.chapter===1);
+const refToUrl=(book,st,en,ver)=>{ const r=(en&&en!==st)?`${book} ${st}-${en}`:`${book} ${st}`; return `https://www.biblegateway.com/passage/?search=${encodeURIComponent(r)}&version=${encodeURIComponent(ver)}`; };
+const dayOfYear=(d=new Date())=> Math.floor((d - new Date(d.getFullYear(),0,1))/86400000);
+function dailyDistribution(total,days=365){ const out=[]; for(let d=0; d<days; d++){ const t=Math.round(((d+1)*total)/days); const p=Math.round((d*total)/days); out.push(t-p);} return out; }
+function buildRanges(counts,startIdx){ const out=[]; let idx=startIdx; for(const n of counts){ let start=flatten[idx]; let left=n; let last=start; while(left>0 && idx<flatten.length){ last=flatten[idx]; idx++; left--; } out.push({startBook:start.book,startCh:start.chapter,endBook:last.book,endCh:last.chapter}); } return out; }
+function psPrForDay(d){ if(d%2===0){ const ps=Math.floor(d/2)%150+1; return {book:'Psalms',start:ps,end:ps}; } const pr=Math.floor(d/2)%31+1; return {book:'Proverbs',start:pr,end:pr}; }
+const OT_CHAPTERS = findStart('Matthew'); // 929
+const NT_CHAPTERS = flatten.length - OT_CHAPTERS; // 260
+const otPerDay = dailyDistribution(OT_CHAPTERS,365);
+const ntPerDay = dailyDistribution(NT_CHAPTERS*2,365);
+const OT_RANGES = buildRanges(otPerDay,0);
+const NT_RANGES = buildRanges(ntPerDay,findStart('Matthew'));
+function adultDay(d){ const ot=OT_RANGES[d], nt=NT_RANGES[d], pp=psPrForDay(d);
+  return [{label:'Old Testament', book:ot.startBook, start:ot.startCh, end:ot.endCh, version:'ESV'},
+          {label:'New Testament', book:nt.startBook, start:nt.startCh, end:nt.endCh, version:'ESV'},
+          {label: pp.book==='Psalms'?'Psalm':'Proverb', book:pp.book, start:pp.start, end:pp.end, version:'ESV'}]; }
+function kidsDay(d){ const main=d%2===0?{book:OT_RANGES[d].startBook,start:OT_RANGES[d].startCh,end:OT_RANGES[d].startCh}:{book:NT_RANGES[d].startBook,start:NT_RANGES[d].startCh,end:NT_RANGES[d].startCh}; const pp=psPrForDay(d);
+  return [{label:'Main Story', book:main.book, start:main.start, end:main.end, version:'NIrV'},
+          {label: pp.book==='Psalms'?'Psalm':'Proverb', book:pp.book, start:pp.start, end:pp.end, version:'NIrV'}]; }
+const KEY='family-bible-reading-nsw';
+function load(){ try{return JSON.parse(localStorage.getItem(KEY))||{};}catch{return{};} }
+function save(x){ localStorage.setItem(KEY, JSON.stringify(x)); }
+const defaultProfiles=[{id:'dad',name:'Dad',type:'adult'},{id:'mom',name:'Mom',type:'adult'},{id:'elle',name:'Elle',type:'kid'},{id:'lainey',name:'Lainey',type:'kid'}];
+
+let S = load();
+if(!S.profiles) S.profiles = defaultProfiles;
+if(!S.activeId) S.activeId = S.profiles[0].id;
+if(typeof S.offset!=='number') S.offset=0;
+if(!S.completed) S.completed={};
+S.today = dayOfYear();
+
+function isDone(pid, day, i){ const arr = S.completed[pid+':'+day]||[]; return arr.indexOf(i)!==-1; }
+function toggle(pid, day, i){ const k=pid+':'+day; const set=new Set(S.completed[k]||[]); if(set.has(i)) set.delete(i); else set.add(i); S.completed[k]=Array.from(set); save(S); render(); }
+function markAll(pid, day, len){ S.completed[pid+':'+day]=Array.from({length:len},(_,i)=>i); save(S); render(); }
+function percent(pid, type){ let done=0; for(let d=0; d<=S.today; d++){ const key=pid+':'+d; const need=(type==='adult'?3:2); if((S.completed[key]||[]).length>=need) done++; } return Math.round((done/(S.today+1))*100); }
+function current(profile, day){ return profile.type==='adult' ? adultDay(day) : kidsDay(day); }
+function fmt(r){ return r.start===r.end? `${r.book} ${r.start}`:`${r.book} ${r.start}-${r.end}`; }
+
+function render(){
+  const userSel = document.getElementById('user');
+  userSel.innerHTML='';
+  S.profiles.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; if(p.id===S.activeId) o.selected=true; userSel.appendChild(o); });
+  userSel.onchange = e=>{ S.activeId=e.target.value; save(S); render(); };
+
+  document.getElementById('yesterday').onclick = ()=>{ S.today=(S.today+364)%365; render(); };
+  document.getElementById('tomorrow').onclick  = ()=>{ S.today=(S.today+1)%365; render(); };
+  document.getElementById('prev').onclick      = ()=>{ S.offset--; render(); };
+  document.getElementById('next').onclick      = ()=>{ S.offset++; render(); };
+  document.getElementById('markAll').onclick   = ()=>{ const p = S.profiles.find(x=>x.id===S.activeId)||S.profiles[0]; const r=current(p, (S.today+S.offset+365)%365); markAll(p.id, S.today, r.length); };
+
+  const p = S.profiles.find(x=>x.id===S.activeId)||S.profiles[0];
+  document.getElementById('progressPct').textContent = percent(p.id, p.type)+'%';
+  const idx = (S.today + S.offset + 365)%365;
+  const readings = current(p, idx);
+
+  const cards = document.getElementById('cards');
+  cards.innerHTML='';
+  readings.forEach((r,i)=>{
+    const card=document.createElement('div');
+    const kid = p.type==='kid';
+    card.className='p-4 rounded-2xl border '+(kid?'kid-card':'adult-card')+(isDone(p.id,S.today,i)?' completed':'');
+    const row=document.createElement('div'); row.className='flex items-center justify-between';
+    const left=document.createElement('div');
+    const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide text-gray-500'; tag.textContent=r.label;
+    const title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=fmt(r);
+    const a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
+    left.appendChild(tag); left.appendChild(title); left.appendChild(a);
+    const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,S.today,i)?'bg-green-600 text-white':'border'); btn.textContent=isDone(p.id,S.today,i)?'✅ Done':'Mark complete';
+    btn.onclick=()=> toggle(p.id,S.today,i);
+    row.appendChild(left); row.appendChild(btn);
+    card.appendChild(row);
+    cards.appendChild(card);
+  });
+
+  document.getElementById('peekTitle').textContent = p.type==='adult' ? 'Tomorrow (Adults • ESV)' : 'Tomorrow (Kids • NIrV)';
+  const peek = document.getElementById('peek');
+  peek.innerHTML='';
+  const tmr = current(p, (S.today+1)%365);
+  tmr.forEach((r)=>{
+    const row=document.createElement('div'); row.className='p-3 rounded-xl border bg-gray-50';
+    const l1=document.createElement('div'); l1.className='text-sm uppercase tracking-wide text-gray-500'; l1.textContent=r.label;
+    const l2=document.createElement('div'); l2.className='font-medium'; l2.textContent=fmt(r);
+    const a=document.createElement('a'); a.className='text-xs underline'; a.href=refToUrl(r.book,r.start,r.end,r.version); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now ('+r.version+')';
+    row.appendChild(l1); row.appendChild(l2); row.appendChild(a);
+    peek.appendChild(row);
+  });
+}
+render();
+</script>
+</body>
 </html>
