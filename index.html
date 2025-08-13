@@ -17,15 +17,20 @@
     :root{
       --bg: #f8fafc; --card:#ffffff; --border:#e5e7eb; --text:#0f172a; --muted:#64748b; --accent:#0ea5e9;
       --adult-start:#f0f9ff; --adult-end:#e0f2fe;
+      /* Overlay for kids image backgrounds in LIGHT */
+      --kid-overlay: rgba(255,255,255,.78);
     }
     [data-theme="dark"]{
       --bg:#0b1020; --card:#0f172a; --border:#1f2a44; --text:#e2e8f0; --muted:#94a3b8; --accent:#22d3ee;
       --adult-start:#0f1b2a; --adult-end:#0b2a3a;
+      /* Overlay for kids image backgrounds in DARK */
+      --kid-overlay: rgba(0,0,0,.45);
     }
     @media (prefers-color-scheme: dark){
       [data-theme="auto"]{
         --bg:#0b1020; --card:#0f172a; --border:#1f2a44; --text:#e2e8f0; --muted:#94a3b8; --accent:#22d3ee;
         --adult-start:#0f1b2a; --adult-end:#0b2a3a;
+        --kid-overlay: rgba(0,0,0,.45);
       }
     }
     body{ background: var(--bg); color: var(--text); }
@@ -43,23 +48,13 @@
     .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
     .modal { background: var(--card); border:1px solid var(--border); border-radius: 16px; max-width: 680px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
     .btn-fun { background: linear-gradient(90deg,#22d3ee,#60a5fa); color: white; border: none; }
-  /* iPhone portrait optimizations for Kids cards (baked-in) */
-@media (max-width: 420px){
-  .kid-sticker{ width:84px; height:84px; border-radius:20px; }
-  .kid-row{ flex-direction: column; align-items: stretch; gap:12px; }
-  .kid-left > .short-pill{ 
-    display:inline-block; 
-    font-size:14px; 
-    line-height:1.2; 
-    padding:6px 10px; 
-    max-width:100%; 
-    white-space:normal;
-  }
-  .kid-left a.underline{ display:inline-block; margin-top:6px; }
-  .kid-btn{ width:100%; padding:12px 14px; font-size:16px; }
-  #peek .kid-sticker{ width:72px; height:72px; border-radius:16px; }
-}
-</style>
+
+    /* --- Kids card faded background helpers --- */
+    .kid-card-bg { position:relative; overflow:hidden; }
+    .kid-card-bg .bg-img { position:absolute; inset:0; background-size:cover; background-position:center; filter:saturate(105%) contrast(95%); }
+    .kid-card-bg .bg-fade { position:absolute; inset:0; background:var(--kid-overlay); }
+    .kid-card-bg .content { position:relative; z-index:10; }
+  </style>
 </head>
 <body>
   <div class="max-w-3xl mx-auto px-4 py-6">
@@ -168,7 +163,8 @@ BOOKS.forEach(b=>{ bookStartIndex[b.n] = flatten.length; for(let i=1;i<=b.c;i++)
 
 // ---- Helpers ----
 const refToUrl=(book,st,en,ver)=>{ const r=(en&&en!==st)?`${book} ${st}-${en}`:`${book} ${st}`; return `https://www.biblegateway.com/passage/?search=${encodeURIComponent(r)}&version=${encodeURIComponent(ver)}`; };
-const dayOfYear=(d=new Date())=> Math.floor((d - new Date(d.getFullYear(),0,1))/86400000);
+function dayOfYear(d=new Date()){ return Math.floor((d - new Date(d.getFullYear(),0,1))/86400000); }
+function toRef(book,start,end){ return start===end? (book+' '+start) : (book+' '+start+'-'+end); }
 
 // ---- Adult plan (ESV) ----
 function dailyDistribution(total,days=365){ const out=[]; for(let d=0; d<days; d++){ const t=Math.round(((d+1)*total)/days); const p=Math.round((d*total)/days); out.push(t-p);} return out; }
@@ -189,8 +185,8 @@ function adultDay(d){ const ot=OT_RANGES[d], nt=NT_RANGES[d], pp=psPrForDay(d);
           {label: pp.book==='Psalms'?'Psalm':'Proverb', book:pp.book, start:pp.start, end:pp.end, version:'ESV'}]; }
 
 // ---- Kids stories data ----
-const STORIES_OT = [{"title": "Creation", "book": "Genesis", "start": 1, "end": 2, "short": "God creates", "long": "God made the world good and people in His image.", "img": "story-creation.png"}, {"title": "Adam & Eve", "book": "Genesis", "start": 3, "end": 3, "short": "First family", "long": "Adam and Eve disobeyed God, but He promised a Savior.", "img": "ph-adam---eve.png"}, {"title": "Noah\u2019s Ark", "book": "Genesis", "start": 6, "end": 9, "short": "God rescues", "long": "God saved Noah\u2019s family and set a rainbow promise.", "img": "story-noah.png"}, {"title": "Tower of Babel", "book": "Genesis", "start": 11, "end": 11, "short": "Proud tower", "long": "God scattered people by confusing their language.", "img": "ph-tower-of-babel.png"}, {"title": "God\u2019s Promise to Abram", "book": "Genesis", "start": 12, "end": 15, "short": "Stars promise", "long": "God promised Abram a big family to bless the world.", "img": "ph-god-s-promise-to-abram.png"}, {"title": "Joseph\u2019s Dreams", "book": "Genesis", "start": 37, "end": 37, "short": "God at work", "long": "God used Joseph\u2019s trials to save many people.", "img": "ph-joseph-s-dreams.png"}, {"title": "Moses & Burning Bush", "book": "Exodus", "start": 3, "end": 3, "short": "God calls", "long": "God sent Moses to free His people.", "img": "ph-moses---burning-bush.png"}, {"title": "Crossing the Red Sea", "book": "Exodus", "start": 14, "end": 14, "short": "Sea parts", "long": "God rescued Israel through the sea.", "img": "ph-crossing-the-red-sea.png"}, {"title": "Ten Commandments", "book": "Exodus", "start": 20, "end": 20, "short": "God\u2019s ways", "long": "God gave good commands for life.", "img": "ph-ten-commandments.png"}, {"title": "Walls of Jericho", "book": "Joshua", "start": 6, "end": 6, "short": "Walls fall", "long": "God brought the walls down as Israel obeyed.", "img": "ph-walls-of-jericho.png"}, {"title": "Gideon\u2019s Victory", "book": "Judges", "start": 7, "end": 7, "short": "Small but brave", "long": "God saved Israel with a small army.", "img": "ph-gideon-s-victory.png"}, {"title": "David & Goliath", "book": "1 Samuel", "start": 17, "end": 17, "short": "Brave faith", "long": "David trusted God and beat the giant.", "img": "story-david-goliath.png"}, {"title": "Elijah on Mount Carmel", "book": "1 Kings", "start": 18, "end": 18, "short": "God answers", "long": "God showed His power over false gods.", "img": "ph-elijah-on-mount-carmel.png"}, {"title": "Elisha Helps", "book": "2 Kings", "start": 4, "end": 4, "short": "Kind miracles", "long": "God cared for people through Elisha.", "img": "ph-elisha-helps.png"}, {"title": "Queen Esther", "book": "Esther", "start": 4, "end": 7, "short": "For such time", "long": "God used Esther to protect His people.", "img": "ph-queen-esther.png"}, {"title": "Daniel in Lions\u2019 Den", "book": "Daniel", "start": 6, "end": 6, "short": "God protects", "long": "God kept Daniel safe with the lions.", "img": "ph-daniel-in-lions--den.png"}, {"title": "Jonah & Big Fish", "book": "Jonah", "start": 1, "end": 2, "short": "Second chance", "long": "God gave Jonah and Nineveh mercy.", "img": "story-jonah.png"}];
-const STORIES_NT = [{"title": "Jesus Is Born", "book": "Luke", "start": 2, "end": 2, "short": "Savior born", "long": "Jesus was born in Bethlehem\u2014good news of great joy!", "img": "story-nativity.png"}, {"title": "Boy Jesus at the Temple", "book": "Luke", "start": 2, "end": 41, "short": "Growing in wisdom", "long": "Jesus loved His Father\u2019s house.", "img": "ph-boy-jesus-at-the-temple.png"}, {"title": "Baptism of Jesus", "book": "Matthew", "start": 3, "end": 3, "short": "Loved Son", "long": "The Father said, \u201cThis is my beloved Son.\u201d", "img": "ph-baptism-of-jesus.png"}, {"title": "Jesus Calms the Storm", "book": "Mark", "start": 4, "end": 35, "short": "Peace be still", "long": "Jesus spoke and the sea became calm.", "img": "ph-jesus-calms-the-storm.png"}, {"title": "Feeding 5,000", "book": "John", "start": 6, "end": 1, "short": "God provides", "long": "Jesus fed a crowd with little food.", "img": "ph-feeding-5-000.png"}, {"title": "Good Samaritan", "book": "Luke", "start": 10, "end": 25, "short": "Love neighbors", "long": "Jesus taught us to show mercy.", "img": "ph-good-samaritan.png"}, {"title": "Prodigal Son", "book": "Luke", "start": 15, "end": 11, "short": "Father\u2019s love", "long": "The father welcomed his son home with joy.", "img": "ph-prodigal-son.png"}, {"title": "Good Shepherd", "book": "John", "start": 10, "end": 1, "short": "Jesus cares", "long": "Jesus knows and leads His sheep.", "img": "ph-good-shepherd.png"}, {"title": "Zacchaeus", "book": "Luke", "start": 19, "end": 1, "short": "Changed heart", "long": "Jesus welcomed Zacchaeus; his life changed.", "img": "ph-zacchaeus.png"}, {"title": "Palm Sunday", "book": "Matthew", "start": 21, "end": 1, "short": "Hail the King", "long": "Jesus entered Jerusalem as promised King.", "img": "ph-palm-sunday.png"}, {"title": "Last Supper", "book": "Luke", "start": 22, "end": 7, "short": "New covenant", "long": "Jesus gave bread and cup to remember Him.", "img": "ph-last-supper.png"}, {"title": "Cross & Resurrection", "book": "Luke", "start": 23, "end": 24, "short": "Jesus wins", "long": "Jesus died and rose to save us.", "img": "ph-cross---resurrection.png"}, {"title": "Doubting Thomas", "book": "John", "start": 20, "end": 24, "short": "Believe & see", "long": "Jesus showed His wounds; Thomas believed.", "img": "ph-doubting-thomas.png"}, {"title": "Great Commission", "book": "Matthew", "start": 28, "end": 16, "short": "Go and tell", "long": "Jesus sent us to make disciples.", "img": "ph-great-commission.png"}, {"title": "Pentecost", "book": "Acts", "start": 2, "end": 1, "short": "Spirit comes", "long": "God sent the Holy Spirit to the church.", "img": "ph-pentecost.png"}, {"title": "Peter in Prison", "book": "Acts", "start": 12, "end": 1, "short": "God sets free", "long": "An angel rescued Peter from chains.", "img": "ph-peter-in-prison.png"}, {"title": "Paul\u2019s Conversion", "book": "Acts", "start": 9, "end": 1, "short": "New start", "long": "Jesus met Saul; he became Paul.", "img": "ph-paul-s-conversion.png"}, {"title": "Paul & Silas Sing", "book": "Acts", "start": 16, "end": 16, "short": "Joy in jail", "long": "God shook the prison; the jailer believed.", "img": "ph-paul---silas-sing.png"}, {"title": "Armor of God", "book": "Ephesians", "start": 6, "end": 10, "short": "Stand strong", "long": "God gives armor to live for Him.", "img": "ph-armor-of-god.png"}, {"title": "Fruit of the Spirit", "book": "Galatians", "start": 5, "end": 22, "short": "Grow like Jesus", "long": "The Spirit grows love and joy in us.", "img": "ph-fruit-of-the-spirit.png"}];
+const STORIES_OT = [{"title":"Creation","book":"Genesis","start":1,"end":2,"short":"God creates","long":"God made the world good and people in His image.","img":"story-creation.png"},{"title":"Adam & Eve","book":"Genesis","start":3,"end":3,"short":"First family","long":"Adam and Eve disobeyed God, but He promised a Savior.","img":"ph-adam---eve.png"},{"title":"Noah’s Ark","book":"Genesis","start":6,"end":9,"short":"God rescues","long":"God saved Noah’s family and set a rainbow promise.","img":"story-noah.png"},{"title":"Tower of Babel","book":"Genesis","start":11,"end":11,"short":"Proud tower","long":"God scattered people by confusing their language.","img":"ph-tower-of-babel.png"},{"title":"God’s Promise to Abram","book":"Genesis","start":12,"end":15,"short":"Stars promise","long":"God promised Abram a big family to bless the world.","img":"ph-god-s-promise-to-abram.png"},{"title":"Joseph’s Dreams","book":"Genesis","start":37,"end":37,"short":"God at work","long":"God used Joseph’s trials to save many people.","img":"ph-joseph-s-dreams.png"},{"title":"Moses & Burning Bush","book":"Exodus","start":3,"end":3,"short":"God calls","long":"God sent Moses to free His people.","img":"ph-moses---burning-bush.png"},{"title":"Crossing the Red Sea","book":"Exodus","start":14,"end":14,"short":"Sea parts","long":"God rescued Israel through the sea.","img":"ph-crossing-the-red-sea.png"},{"title":"Ten Commandments","book":"Exodus","start":20,"end":20,"short":"God’s ways","long":"God gave good commands for life.","img":"ph-ten-commandments.png"},{"title":"Walls of Jericho","book":"Joshua","start":6,"end":6,"short":"Walls fall","long":"God brought the walls down as Israel obeyed.","img":"ph-walls-of-jericho.png"},{"title":"Gideon’s Victory","book":"Judges","start":7,"end":7,"short":"Small but brave","long":"God saved Israel with a small army.","img":"ph-gideon-s-victory.png"},{"title":"David & Goliath","book":"1 Samuel","start":17,"end":17,"short":"Brave faith","long":"David trusted God and beat the giant.","img":"story-david-goliath.png"},{"title":"Elijah on Mount Carmel","book":"1 Kings","start":18,"end":18,"short":"God answers","long":"God showed His power over false gods.","img":"ph-elijah-on-mount-carmel.png"},{"title":"Elisha Helps","book":"2 Kings","start":4,"end":4,"short":"Kind miracles","long":"God cared for people through Elisha.","img":"ph-elisha-helps.png"},{"title":"Queen Esther","book":"Esther","start":4,"end":7,"short":"For such time","long":"God used Esther to protect His people.","img":"ph-queen-esther.png"},{"title":"Daniel in Lions’ Den","book":"Daniel","start":6,"end":6,"short":"God protects","long":"God kept Daniel safe with the lions.","img":"ph-daniel-in-lions--den.png"},{"title":"Jonah & Big Fish","book":"Jonah","start":1,"end":2,"short":"Second chance","long":"God gave Jonah and Nineveh mercy.","img":"story-jonah.png"}];
+const STORIES_NT = [{"title":"Jesus Is Born","book":"Luke","start":2,"end":2,"short":"Savior born","long":"Jesus was born in Bethlehem—good news of great joy!","img":"story-nativity.png"},{"title":"Boy Jesus at the Temple","book":"Luke","start":2,"end":41,"short":"Growing in wisdom","long":"Jesus loved His Father’s house.","img":"ph-boy-jesus-at-the-temple.png"},{"title":"Baptism of Jesus","book":"Matthew","start":3,"end":3,"short":"Loved Son","long":"The Father said, “This is my beloved Son.”","img":"ph-baptism-of-jesus.png"},{"title":"Jesus Calms the Storm","book":"Mark","start":4,"end":35,"short":"Peace be still","long":"Jesus spoke and the sea became calm.","img":"ph-jesus-calms-the-storm.png"},{"title":"Feeding 5,000","book":"John","start":6,"end":1,"short":"God provides","long":"Jesus fed a crowd with little food.","img":"ph-feeding-5-000.png"},{"title":"Good Samaritan","book":"Luke","start":10,"end":25,"short":"Love neighbors","long":"Jesus taught us to show mercy.","img":"ph-good-samaritan.png"},{"title":"Prodigal Son","book":"Luke","start":15,"end":11,"short":"Father’s love","long":"The father welcomed his son home with joy.","img":"ph-prodigal-son.png"},{"title":"Good Shepherd","book":"John","start":10,"end":1,"short":"Jesus cares","long":"Jesus knows and leads His sheep.","img":"ph-good-shepherd.png"},{"title":"Zacchaeus","book":"Luke","start":19,"end":1,"short":"Changed heart","long":"Jesus welcomed Zacchaeus; his life changed.","img":"ph-zacchaeus.png"},{"title":"Palm Sunday","book":"Matthew","start":21,"end":1,"short":"Hail the King","long":"Jesus entered Jerusalem as promised King.","img":"ph-palm-sunday.png"},{"title":"Last Supper","book":"Luke","start":22,"end":7,"short":"New covenant","long":"Jesus gave bread and cup to remember Him.","img":"ph-last-supper.png"},{"title":"Cross & Resurrection","book":"Luke","start":23,"end":24,"short":"Jesus wins","long":"Jesus died and rose to save us.","img":"ph-cross---resurrection.png"},{"title":"Doubting Thomas","book":"John","start":20,"end":24,"short":"Believe & see","long":"Jesus showed His wounds; Thomas believed.","img":"ph-doubting-thomas.png"},{"title":"Great Commission","book":"Matthew","start":28,"end":16,"short":"Go and tell","long":"Jesus sent us to make disciples.","img":"ph-great-commission.png"},{"title":"Pentecost","book":"Acts","start":2,"end":1,"short":"Spirit comes","long":"God sent the Holy Spirit to the church.","img":"ph-pentecost.png"},{"title":"Peter in Prison","book":"Acts","start":12,"end":1,"short":"God sets free","long":"An angel rescued Peter from chains.","img":"ph-peter-in-prison.png"},{"title":"Paul’s Conversion","book":"Acts","start":9,"end":1,"short":"New start","long":"Jesus met Saul; he became Paul.","img":"ph-paul-s-conversion.png"},{"title":"Paul & Silas Sing","book":"Acts","start":16,"end":16,"short":"Joy in jail","long":"God shook the prison; the jailer believed.","img":"ph-paul---silas-sing.png"},{"title":"Armor of God","book":"Ephesians","start":6,"end":10,"short":"Stand strong","long":"God gives armor to live for Him.","img":"ph-armor-of-god.png"},{"title":"Fruit of the Spirit","book":"Galatians","start":5,"end":22,"short":"Grow like Jesus","long":"The Spirit grows love and joy in us.","img":"ph-fruit-of-the-spirit.png"}];
 
 // ---- State (new key resets kids progress) ----
 const KEY='fbr-full2-otnt-stories';
@@ -209,7 +205,21 @@ function ensureOrders(){
 }
 ensureOrders();
 
-function toRef(book,start,end){ return start===end? (book+' '+start) : (book+' '+start+'-'+end); }
+// ---- helper to apply faded background to a card ----
+function applyFadedBg(cardEl, imgPath){
+  cardEl.classList.add('kid-card-bg');
+  const bg = document.createElement('div');
+  bg.className = 'bg-img';
+  bg.style.backgroundImage = `url(${imgPath})`;
+  const fade = document.createElement('div');
+  fade.className = 'bg-fade';
+  const content = document.createElement('div');
+  content.className = 'content';
+  cardEl.appendChild(bg);
+  cardEl.appendChild(fade);
+  cardEl.appendChild(content);
+  return content; // append the rest of the card into this
+}
 
 // selector: alternate OT/NT by calendar day parity, always start with OT today
 function kidsToday(){
@@ -249,7 +259,7 @@ function markAll(pid, day, len, meta){ S.completed[pid+':'+day]=Array.from({leng
 function percent(pid, type){ let done=0; for(let d=0; d<=dayOfYear(); d++){ const key=pid+':'+d; const need=(type==='adult'?3:1); if((S.completed[key]||[]).length>=need) done++; } return Math.round((done/(dayOfYear()+1))*100); }
 
 // confetti
-function confetti(){ const host=document.getElementById('confetti'); if(!host) return; const pieces=16; const W=window.innerWidth, H=window.innerHeight; for(let i=0;i<pieces;i++){ const s=document.createElement('div'); s.className='piece'; s.style.left=(W/2)+'px'; s.style.top=(H/3)+'px'; const dx=(Math.random()*2-1)*W*0.6; const dy=H*(0.6+Math.random()*0.4); s.style.setProperty('--dx', dx+'px'); s.style.setProperty('--dy', dy+'px'); s.textContent = ['🎉','✨','🌟','💫','🎈','🟡','🟣','🔵'][i%8]; host.appendChild(s); setTimeout(()=> host.removeChild(s), 1300);} }
+function confetti(){ const host=document.getElementById('confetti'); if(!host) return; const pieces=16; const W=window.innerWidth, H=window.innerHeight; for(let i=0;i<pieces;i++){ const s=document.createElement('div'); s.className='piece'; s.style.left=(W/2)+'px'; s.style.top=(H/3)+'px'; const dx=(Math.random()*2-1)*W*0.6; const dy=H*(0.6+Math.random()*0.4); s.style.setProperty('--dx', dx+'px'); s.style.setProperty('--dy', dy+'px'); s.textContent=['🎉','✨','🌟','💫','🎈','🟡','🟣','🔵'][i%8]; host.appendChild(s); setTimeout(()=> host.removeChild(s),1300);} }
 
 // modal
 function openModal(imgSrc, title, ref, body, link){
@@ -296,7 +306,6 @@ function showRestartIfParent(){
 
 // render helpers
 function shortPill(text, onClick){ const s=document.createElement('span'); s.className='short-pill'; s.textContent=text; s.onclick=onClick; return s; }
-function toRef(book,start,end){ return start===end? (book+' '+start) : (book+' '+start+'-'+end); }
 
 function render(){
   showRestartIfParent();
@@ -326,24 +335,29 @@ function render(){
     const today = kidsToday();
     kids.forEach(child=>{
       const st = today;
+
+      // Card with faded story background
       const card=document.createElement('div'); card.className='p-4 rounded-2xl card';
+      const content = applyFadedBg(card, 'images/'+st.img);
+
       const head=document.createElement('div'); head.className='flex items-center gap-3 mb-2';
       const img=document.createElement('img'); img.src='images/'+st.img; img.alt=st.title; img.className='kid-sticker';
-      const title=document.createElement('div'); title.innerHTML = '<div class="text-sm uppercase tracking-wide muted">'+child.name+'</div><div class="text-lg font-semibold">'+st.title+'</div>';
-      head.appendChild(img); head.appendChild(title); card.appendChild(head);
+      const title=document.createElement('div');
+      title.innerHTML = '<div class="text-sm uppercase tracking-wide muted">'+child.name+'</div><div class="text-lg font-semibold">'+st.title+'</div>';
+      head.appendChild(img); head.appendChild(title); content.appendChild(head);
 
       const ref=document.createElement('div'); ref.className='font-medium'; ref.textContent = toRef(st.book, st.start, st.end);
       const link=document.createElement('a'); link.className='text-sm underline'; link.href=refToUrl(st.book, st.start, st.end, 'NIrV'); link.target='_blank'; link.rel='noreferrer'; link.textContent='Read now (NIrV)';
       const pill=shortPill(st.short, ()=>openModal('images/'+st.img, st.title, ref.textContent, st.long, link.href));
 
-      const row=document.createElement('div'); row.className='flex items-center justify-between mt-2 kid-row';
-      const left=document.createElement('div'); left.className='kid-left'; left.appendChild(pill); left.appendChild(document.createElement('div')).appendChild(link);
-      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded kid-btn '+(isDone(child.id,dayOfYear(),0)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(child.id,dayOfYear(),0)?'✅ Done':'Mark complete';
+      const row=document.createElement('div'); row.className='flex items-center justify-between mt-2';
+      const left=document.createElement('div'); left.appendChild(pill); left.appendChild(document.createElement('div')).appendChild(link);
+      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(child.id,dayOfYear(),0)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(child.id,dayOfYear(),0)?'✅ Done':'Mark complete';
       btn.onclick=()=> toggle(child.id, dayOfYear(), 0, {side:st.side});
 
-      card.appendChild(ref);
+      content.appendChild(ref);
       row.appendChild(left); row.appendChild(btn);
-      card.appendChild(row);
+      content.appendChild(row);
 
       cards.appendChild(card);
     });
@@ -362,9 +376,9 @@ function render(){
     if(p.type==='adult'){
       const readings = adultDay((dayOfYear()+S.offset+365)%365);
       readings.forEach((r,i)=>{
-        const card=document.createElement('div'); card.className='p-4 rounded-2xl adult-card'+(isDone(p.id,dayOfYear(),i)?' completed':'');
-        const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between kid-row';
-        const left=document.createElement('div'); left.className='flex-1 kid-left';
+        const card=document.createElement('div'); card.className='p-4 rounded-2xl adult-card'+(isDone(p.id,dayOfYear(),i)?' completed':''); 
+        const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between';
+        const left=document.createElement('div'); left.className='flex-1';
         const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide muted'; tag.textContent=r.label;
         const pill=shortPill((r.book==='Psalms'?'Praise & Prayer':(r.book==='Proverbs'?'Wisdom for Life':'Read & Reflect')), ()=>openModal('', r.label, toRef(r.book, r.start, r.end), 'A reading to know God and walk with Him.', refToUrl(r.book,r.start,r.end,r.version)));
         const title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=toRef(r.book, r.start, r.end);
@@ -388,20 +402,26 @@ function render(){
         row.appendChild(l); peek.appendChild(row);
       });
     } else {
+      // Single kids view (active user is a kid)
       const st = kidsToday();
       const card=document.createElement('div'); card.className='p-4 rounded-2xl card'+(isDone(p.id,dayOfYear(),0)?' completed':'');
-      const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between kid-row';
-      const left=document.createElement('div'); left.className='flex-1 kid-left';
+      const content = applyFadedBg(card, 'images/'+st.img);
+
+      const row=document.createElement('div'); row.className='flex items-center gap-4 justify-between';
+      const left=document.createElement('div'); left.className='flex-1';
       const tag=document.createElement('div'); tag.className='text-sm uppercase tracking-wide muted'; tag.textContent='Bible Story';
       const pill=shortPill(st.short, ()=>openModal('images/'+st.img, st.title, toRef(st.book, st.start, st.end), st.long, refToUrl(st.book,st.start,st.end,'NIrV')));
       const title=document.createElement('div'); title.className='text-xl font-semibold'; title.textContent=st.title+' — '+toRef(st.book, st.start, st.end);
       const a=document.createElement('a'); a.className='text-sm underline'; a.href=refToUrl(st.book,st.start,st.end,'NIrV'); a.target='_blank'; a.rel='noreferrer'; a.textContent='Read now (NIrV)';
       left.appendChild(tag); left.appendChild(pill); left.appendChild(title); left.appendChild(a);
+
       const img=document.createElement('img'); img.src='images/'+st.img; img.alt=st.title; img.className='kid-sticker';
-      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded kid-btn '+(isDone(p.id,dayOfYear(),0)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(p.id,dayOfYear(),0)?'✅ Done':'Mark complete';
+      const btn=document.createElement('button'); btn.className='px-3 py-2 rounded '+(isDone(p.id,dayOfYear(),0)?'bg-green-600 text-white':'bordered bg-transparent'); btn.textContent=isDone(p.id,dayOfYear(),0)?'✅ Done':'Mark complete';
       btn.onclick=()=> toggle(p.id, dayOfYear(), 0, {side:st.side});
+
       row.appendChild(img); row.appendChild(left); row.appendChild(btn);
-      card.appendChild(row); cards.appendChild(card);
+      content.appendChild(row);
+      cards.appendChild(card);
 
       document.getElementById('peekTitle').textContent = 'Tomorrow (Kids story)';
       const peek=document.getElementById('peek'); peek.innerHTML='';
@@ -417,5 +437,9 @@ function render(){
 }
 render();
 </script>
+
+<!-- Optional: Logos deep-link patch -->
+<!-- <script src="logos-patch.js"></script> -->
+
 </body>
 </html>
